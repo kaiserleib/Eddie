@@ -452,7 +452,26 @@
                         note.dataset.staff = staffIndex;
                         note.dataset.string = stringIndex;
                         note.dataset.position = pos;
-                        note.addEventListener('click', () => handleNoteClick(staffIndex, stringIndex, pos));
+                        note.addEventListener('click', (e) => {
+                            if (note.dataset.longPressTriggered) {
+                                delete note.dataset.longPressTriggered;
+                                return;
+                            }
+                            handleNoteClick(staffIndex, stringIndex, pos);
+                        });
+
+                        // Long press to delete (mobile)
+                        let longPressTimer;
+                        note.addEventListener('touchstart', (e) => {
+                            longPressTimer = setTimeout(() => {
+                                note.dataset.longPressTriggered = 'true';
+                                deleteNoteAt(staffIndex, stringIndex, pos);
+                            }, 500);
+                        }, { passive: true });
+                        note.addEventListener('touchend', () => clearTimeout(longPressTimer));
+                        note.addEventListener('touchcancel', () => clearTimeout(longPressTimer));
+                        note.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+
                         stringRow.appendChild(note);
                     }
 
@@ -505,6 +524,13 @@
             }
 
             note.textContent = newFret;
+            saveStateToUrl();
+        }
+
+        function deleteNoteAt(staffIndex, stringIndex, position) {
+            const note = getNoteElement(staffIndex, stringIndex, position);
+            if (!note) return;
+            note.textContent = EN_DASH;
             saveStateToUrl();
         }
 

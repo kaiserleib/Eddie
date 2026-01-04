@@ -54,6 +54,7 @@ Eddie works on mobile devices with a responsive layout:
 - Horizontal scrolling for the tab area
 - Larger touch targets
 - Tap to select, tap again to increment fret number
+- Long press to delete a note
 
 ## Technical Details
 
