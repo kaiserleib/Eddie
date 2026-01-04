@@ -62,6 +62,10 @@ Eddie is a single HTML file with no dependencies. It uses:
 - **OfflineAudioContext** for WAV export
 - **URL hash** for state persistence
 
+## Built With Claude
+
+This entire project was built by [Claude](https://claude.ai) (Anthropic's AI assistant) via [Claude Code](https://claude.ai/claude-code). The human's contribution was describing what they wanted and composing the sample songs. Claude wrote all the code, including the Web Audio synthesis, MIDI/WAV export, responsive CSS, and this README.
+
 ## License
 
 MIT
