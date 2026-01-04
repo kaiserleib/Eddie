@@ -32,6 +32,7 @@ Open `index.html` in your browser and select a sample song from the dropdown to 
 ### Export
 - **Export MIDI** - Standard MIDI file compatible with any DAW
 - **Export WAV** - 44.1kHz 16-bit stereo audio file
+- **Copy Tab** - Copy ASCII tablature to clipboard for sharing
 
 ### Save & Share
 - Your composition is automatically saved in the URL

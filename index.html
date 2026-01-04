@@ -332,6 +332,7 @@
             <button class="loop-btn active" id="guitar2Btn" onclick="toggleGuitar2()">Guitar 2</button>
             <button class="loop-btn" id="exportBtn" onclick="exportMidi()">Export MIDI</button>
             <button class="loop-btn" id="exportWavBtn" onclick="exportWav()">Export WAV</button>
+            <button class="loop-btn" id="copyTabBtn" onclick="copyTabToClipboard()">Copy Tab</button>
             <label class="tempo-control">
                 <span>BPM:</span>
                 <input type="number" id="tempoInput" min="40" max="240" value="120" onchange="updateTempo(this.value)">
@@ -1359,6 +1360,69 @@
             const renderedBuffer = await offlineCtx.startRendering();
             const wavData = audioBufferToWav(renderedBuffer);
             downloadWav(wavData, 'eddie-tab.wav');
+        }
+
+        function generateTabText(staffIndex) {
+            const lastPos = findLastNotePosition();
+            if (lastPos < 0) return null;
+
+            const lines = STRING_LABELS.map(label => label + '|');
+
+            for (let pos = 0; pos <= lastPos; pos++) {
+                for (let s = 0; s < STRING_LABELS.length; s++) {
+                    const note = getNoteElement(staffIndex, s, pos);
+                    const value = note ? note.textContent : EN_DASH;
+                    // Pad to 3 chars for alignment (handles frets 0-24)
+                    if (value === EN_DASH) {
+                        lines[s] += '---';
+                    } else {
+                        lines[s] += value.padStart(2, '-') + '-';
+                    }
+                }
+            }
+
+            // Add closing bar
+            for (let s = 0; s < STRING_LABELS.length; s++) {
+                lines[s] += '|';
+            }
+
+            return lines.join('\n');
+        }
+
+        async function copyTabToClipboard() {
+            const tabs = [];
+
+            // Guitar 1
+            const tab1 = generateTabText(0);
+            if (tab1) {
+                tabs.push('Guitar 1:\n' + tab1);
+            }
+
+            // Guitar 2 (if enabled and has notes)
+            if (guitar2Enabled) {
+                const tab2 = generateTabText(1);
+                if (tab2) {
+                    tabs.push('Guitar 2:\n' + tab2);
+                }
+            }
+
+            if (tabs.length === 0) {
+                alert('No notes to copy!');
+                return;
+            }
+
+            const text = tabs.join('\n\n');
+
+            try {
+                await navigator.clipboard.writeText(text);
+                // Brief visual feedback
+                const btn = document.getElementById('copyTabBtn');
+                const original = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = original, 1500);
+            } catch (e) {
+                alert('Failed to copy to clipboard');
+            }
         }
 
         function renderNoteToContext(ctx, frequency, startTime, duration, waveform) {
