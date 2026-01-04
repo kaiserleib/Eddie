@@ -20,7 +20,7 @@ Add a new entry to the array:
 }
 ```
 
-Note: URLs are now LZ-compressed for shorter sharing. Old uncompressed URLs still work.
+Note: URLs use binary packing (~2.5 chars per note) for compact sharing. Old URL formats still work.
 
 ## Guidelines
 

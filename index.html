@@ -355,154 +355,104 @@
         const NUM_STAFFS = 2;
         const EN_DASH = '\u2013';
 
-        // LZ-String compression (minimal implementation for URL-safe encoding)
-        const LZ = (function() {
-            const keyStrUri = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-            const baseReverse = {};
-            for (let i = 0; i < keyStrUri.length; i++) baseReverse[keyStrUri[i]] = i;
+        // Binary packing for URL encoding
+        // Note: 15 bits (staff:1 + string:3 + position:6 + fret:5)
+        // Sustain: 7 bits (staff:1 + position:6)
+        const Pack = (function() {
+            const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+            const B64_REV = {};
+            for (let i = 0; i < 64; i++) B64_REV[B64[i]] = i;
 
-            function compressToEncodedURIComponent(input) {
-                if (input == null) return '';
-                return _compress(input, 6, i => keyStrUri[i]);
-            }
+            function encode(notes, sustains) {
+                // notes: [{staff, string, position, fret}, ...]
+                // sustains: [{staff, position}, ...]
+                const bits = [];
 
-            function decompressFromEncodedURIComponent(input) {
-                if (input == null || input === '') return null;
-                input = input.replace(/ /g, '+');
-                return _decompress(input.length, 32, i => baseReverse[input[i]]);
-            }
+                // Write note count (10 bits, max 1023)
+                const nc = notes.length;
+                for (let i = 9; i >= 0; i--) bits.push((nc >> i) & 1);
 
-            function _compress(uncompressed, bitsPerChar, getCharFromInt) {
-                let context_dictionary = {}, context_dictionaryToCreate = {};
-                let context_c = '', context_wc = '', context_w = '';
-                let context_enlargeIn = 2, context_dictSize = 3, context_numBits = 2;
-                let context_data = [], context_data_val = 0, context_data_position = 0;
-
-                for (let ii = 0; ii < uncompressed.length; ii++) {
-                    context_c = uncompressed[ii];
-                    if (!Object.prototype.hasOwnProperty.call(context_dictionary, context_c)) {
-                        context_dictionary[context_c] = context_dictSize++;
-                        context_dictionaryToCreate[context_c] = true;
-                    }
-                    context_wc = context_w + context_c;
-                    if (Object.prototype.hasOwnProperty.call(context_dictionary, context_wc)) {
-                        context_w = context_wc;
-                    } else {
-                        if (Object.prototype.hasOwnProperty.call(context_dictionaryToCreate, context_w)) {
-                            if (context_w.charCodeAt(0) < 256) {
-                                for (let i = 0; i < context_numBits; i++) {
-                                    context_data_val = (context_data_val << 1);
-                                    if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
-                                }
-                                let value = context_w.charCodeAt(0);
-                                for (let i = 0; i < 8; i++) {
-                                    context_data_val = (context_data_val << 1) | (value & 1);
-                                    if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
-                                    value = value >> 1;
-                                }
-                            } else {
-                                let value = 1;
-                                for (let i = 0; i < context_numBits; i++) {
-                                    context_data_val = (context_data_val << 1) | value;
-                                    if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
-                                    value = 0;
-                                }
-                                value = context_w.charCodeAt(0);
-                                for (let i = 0; i < 16; i++) {
-                                    context_data_val = (context_data_val << 1) | (value & 1);
-                                    if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
-                                    value = value >> 1;
-                                }
-                            }
-                            context_enlargeIn--;
-                            if (context_enlargeIn == 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
-                            delete context_dictionaryToCreate[context_w];
-                        } else {
-                            let value = context_dictionary[context_w];
-                            for (let i = 0; i < context_numBits; i++) {
-                                context_data_val = (context_data_val << 1) | (value & 1);
-                                if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; }
-                                value = value >> 1;
-                            }
-                        }
-                        context_enlargeIn--;
-                        if (context_enlargeIn == 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
-                        context_dictionary[context_wc] = context_dictSize++;
-                        context_w = String(context_c);
-                    }
-                }
-                if (context_w !== '') {
-                    if (Object.prototype.hasOwnProperty.call(context_dictionaryToCreate, context_w)) {
-                        if (context_w.charCodeAt(0) < 256) {
-                            for (let i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1); if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } }
-                            let value = context_w.charCodeAt(0);
-                            for (let i = 0; i < 8; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value = value >> 1; }
-                        } else {
-                            let value = 1;
-                            for (let i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1) | value; if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value = 0; }
-                            value = context_w.charCodeAt(0);
-                            for (let i = 0; i < 16; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value = value >> 1; }
-                        }
-                        context_enlargeIn--;
-                        if (context_enlargeIn == 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
-                        delete context_dictionaryToCreate[context_w];
-                    } else {
-                        let value = context_dictionary[context_w];
-                        for (let i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value = value >> 1; }
-                    }
-                    context_enlargeIn--;
-                    if (context_enlargeIn == 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
-                }
-                let value = 2;
-                for (let i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position == bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value = value >> 1; }
-                while (true) { context_data_val = (context_data_val << 1); if (context_data_position == bitsPerChar - 1) { context_data.push(getCharFromInt(context_data_val)); break; } else context_data_position++; }
-                return context_data.join('');
-            }
-
-            function _decompress(length, resetValue, getNextValue) {
-                let dictionary = [], enlargeIn = 4, dictSize = 4, numBits = 3, entry = '', result = [];
-                let data = { val: getNextValue(0), position: resetValue, index: 1 };
-
-                function readBits(numBits) {
-                    let bits = 0, maxpower = Math.pow(2, numBits), power = 1;
-                    while (power != maxpower) {
-                        let resb = data.val & data.position;
-                        data.position >>= 1;
-                        if (data.position == 0) { data.position = resetValue; data.val = getNextValue(data.index++); }
-                        bits |= (resb > 0 ? 1 : 0) * power;
-                        power <<= 1;
-                    }
-                    return bits;
+                // Write each note (15 bits each)
+                for (const n of notes) {
+                    bits.push(n.staff & 1);
+                    for (let i = 2; i >= 0; i--) bits.push((n.string >> i) & 1);
+                    for (let i = 5; i >= 0; i--) bits.push((n.position >> i) & 1);
+                    for (let i = 4; i >= 0; i--) bits.push((n.fret >> i) & 1);
                 }
 
-                for (let i = 0; i < 3; i++) dictionary[i] = i;
-                let next = readBits(2);
-                if (next === 0) entry = String.fromCharCode(readBits(8));
-                else if (next === 1) entry = String.fromCharCode(readBits(16));
-                else if (next === 2) return '';
-                dictionary[3] = entry;
-                let w = entry;
-                result.push(entry);
+                // Write sustain count (8 bits, max 255)
+                const sc = sustains.length;
+                for (let i = 7; i >= 0; i--) bits.push((sc >> i) & 1);
 
-                while (true) {
-                    if (data.index > length) return '';
-                    let c = readBits(numBits);
-                    if (c === 0) { dictionary[dictSize++] = String.fromCharCode(readBits(8)); c = dictSize - 1; enlargeIn--; }
-                    else if (c === 1) { dictionary[dictSize++] = String.fromCharCode(readBits(16)); c = dictSize - 1; enlargeIn--; }
-                    else if (c === 2) return result.join('');
-                    if (enlargeIn == 0) { enlargeIn = Math.pow(2, numBits); numBits++; }
-                    if (dictionary[c]) entry = dictionary[c];
-                    else if (c === dictSize) entry = w + w[0];
-                    else return null;
-                    result.push(entry);
-                    dictionary[dictSize++] = w + entry[0];
-                    enlargeIn--;
-                    if (enlargeIn == 0) { enlargeIn = Math.pow(2, numBits); numBits++; }
-                    w = entry;
+                // Write each sustain (7 bits each)
+                for (const s of sustains) {
+                    bits.push(s.staff & 1);
+                    for (let i = 5; i >= 0; i--) bits.push((s.position >> i) & 1);
                 }
+
+                // Pad to multiple of 6 for base64
+                while (bits.length % 6 !== 0) bits.push(0);
+
+                // Convert to base64
+                let result = '';
+                for (let i = 0; i < bits.length; i += 6) {
+                    const val = (bits[i] << 5) | (bits[i+1] << 4) | (bits[i+2] << 3) |
+                                (bits[i+3] << 2) | (bits[i+4] << 1) | bits[i+5];
+                    result += B64[val];
+                }
+                return result;
             }
 
-            return { compressToEncodedURIComponent, decompressFromEncodedURIComponent };
+            function decode(str) {
+                if (!str) return null;
+
+                // Convert base64 to bits
+                const bits = [];
+                for (const c of str) {
+                    const val = B64_REV[c];
+                    if (val === undefined) return null;
+                    for (let i = 5; i >= 0; i--) bits.push((val >> i) & 1);
+                }
+
+                let pos = 0;
+                function readBits(n) {
+                    let val = 0;
+                    for (let i = 0; i < n; i++) val = (val << 1) | (bits[pos++] || 0);
+                    return val;
+                }
+
+                // Read note count
+                const noteCount = readBits(10);
+                if (noteCount > 500) return null; // Sanity check
+
+                // Read notes
+                const notes = [];
+                for (let i = 0; i < noteCount; i++) {
+                    notes.push({
+                        staff: readBits(1),
+                        string: readBits(3),
+                        position: readBits(6),
+                        fret: readBits(5)
+                    });
+                }
+
+                // Read sustain count
+                const sustainCount = readBits(8);
+                if (sustainCount > 100) return null; // Sanity check
+
+                // Read sustains
+                const sustains = [];
+                for (let i = 0; i < sustainCount; i++) {
+                    sustains.push({
+                        staff: readBits(1),
+                        position: readBits(6)
+                    });
+                }
+
+                return { notes, sustains };
+            }
+
+            return { encode, decode };
         })();
 
         let selectedStaff = null;
@@ -722,46 +672,39 @@
             }
         }
 
-        // Serialize state to URL
-        // Format: staff0notes|staff1notes where notes are staff.string.position.value
-        // Sustain: s0:pos1,pos2|s1:pos1,pos2
+        // Serialize state to URL using binary packing
         function saveStateToUrl() {
-            const staffNotes = [];
+            const notes = [];
+            const sustains = [];
 
+            // Collect all notes
             for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
-                const notes = [];
                 document.querySelectorAll(`.note[data-staff="${staffIndex}"]`).forEach(note => {
                     const value = note.textContent;
                     if (value !== EN_DASH) {
-                        const s = note.dataset.string;
-                        const p = note.dataset.position;
-                        notes.push(`${s}.${p}.${value}`);
+                        notes.push({
+                            staff: staffIndex,
+                            string: parseInt(note.dataset.string),
+                            position: parseInt(note.dataset.position),
+                            fret: parseInt(value)
+                        });
                     }
                 });
-                staffNotes.push(notes.join(','));
             }
 
-            // Encode sustain positions per staff
-            const sustainParts = [];
+            // Collect sustain toggles
             for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
-                const positions = sustainState[staffIndex]
-                    .map((active, pos) => active ? pos : -1)
-                    .filter(pos => pos >= 0);
-                if (positions.length > 0) {
-                    sustainParts.push(`s${staffIndex}:${positions.join(',')}`);
-                }
-            }
-
-            let stateStr = staffNotes.join('|');
-            if (sustainParts.length > 0) {
-                stateStr += ';' + sustainParts.join('|');
+                sustainState[staffIndex].forEach((active, pos) => {
+                    if (active) {
+                        sustains.push({ staff: staffIndex, position: pos });
+                    }
+                });
             }
 
             // Only save if there's actual content
-            const hasContent = staffNotes.some(s => s.length > 0) || sustainParts.length > 0;
-            if (hasContent) {
-                const compressed = LZ.compressToEncodedURIComponent(stateStr);
-                history.replaceState(null, '', '#' + compressed);
+            if (notes.length > 0 || sustains.length > 0) {
+                const packed = Pack.encode(notes, sustains);
+                history.replaceState(null, '', '#' + packed);
             } else {
                 history.replaceState(null, '', window.location.pathname);
             }
@@ -773,12 +716,27 @@
             if (!hash) return;
 
             try {
-                // Try LZ decompression first, fall back to legacy URL-encoded format
-                let state = LZ.decompressFromEncodedURIComponent(hash);
-                if (!state || !state.includes('.')) {
-                    // Fallback for old uncompressed URLs
-                    state = decodeURIComponent(hash);
+                // Try binary packed format first
+                const packed = Pack.decode(hash);
+                if (packed) {
+                    // Load notes
+                    for (const n of packed.notes) {
+                        const note = getNoteElement(n.staff, n.string, n.position);
+                        if (note) note.textContent = n.fret;
+                    }
+                    // Load sustains
+                    for (const s of packed.sustains) {
+                        if (s.staff < NUM_STAFFS && s.position < NUM_POSITIONS) {
+                            sustainState[s.staff][s.position] = true;
+                            const toggle = document.querySelector(`.sustain-toggle[data-staff="${s.staff}"][data-position="${s.position}"]`);
+                            if (toggle) toggle.classList.add('active');
+                        }
+                    }
+                    return;
                 }
+
+                // Fallback for legacy URL-encoded format
+                const state = decodeURIComponent(hash);
                 const mainParts = state.split(';');
 
                 // Parse notes (first part before ;)
