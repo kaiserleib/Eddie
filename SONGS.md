@@ -20,9 +20,10 @@ Add a new entry to the array:
 }
 ```
 
+Note: URLs are now LZ-compressed for shorter sharing. Old uncompressed URLs still work.
+
 ## Guidelines
 
 - Original compositions or public domain works only
-- Keep songs reasonably short (the URL has limits)
 - Test playback before submitting
 - Have fun!

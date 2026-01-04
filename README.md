@@ -61,7 +61,7 @@ Eddie works on mobile devices with a responsive layout:
 Eddie is a single HTML file with no dependencies. It uses:
 - **Web Audio API** for sound synthesis and playback
 - **OfflineAudioContext** for WAV export
-- **URL hash** for state persistence
+- **URL hash** for state persistence (LZ-compressed for shorter URLs)
 
 ## Built With Claude
 
