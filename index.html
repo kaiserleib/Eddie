@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eddie - Guitar Tab Editor</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #0d0d0d;
+            padding: 40px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: normal;
+        }
+
+        .sample-songs-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .sample-songs-container select {
+            padding: 8px 16px;
+            font-size: 1em;
+        }
+
+        .staffs-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .staff {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .staff-label {
+            color: #666;
+            font-size: 0.8em;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .waveform-select {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            border: 1px solid #444;
+            padding: 2px 5px;
+            font-family: inherit;
+            font-size: 1em;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .waveform-select:hover {
+            border-color: #666;
+        }
+
+        .tempo-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #666;
+        }
+
+        .tempo-control input {
+            width: 60px;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            border: 1px solid #444;
+            padding: 4px 8px;
+            font-family: inherit;
+            font-size: 1em;
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        .tempo-control input:hover {
+            border-color: #666;
+        }
+
+        .tempo-control input:focus {
+            outline: none;
+            border-color: #00ff00;
+        }
+
+        .string {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+
+        .string-label {
+            width: 20px;
+            text-align: right;
+            margin-right: 10px;
+            color: #666;
+        }
+
+        .note {
+            width: 2ch;
+            height: 1.5em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .note:hover {
+            background-color: #333;
+        }
+
+        .note.selected {
+            background-color: #004400;
+        }
+
+        .note.selected::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: #00ff00;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .instructions {
+            margin-top: 30px;
+            color: #666;
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+
+        .instructions kbd {
+            background-color: #333;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid #555;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .play-btn {
+            background-color: #004400;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px 20px;
+            font-family: inherit;
+            font-size: 1em;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .play-btn:hover {
+            background-color: #006600;
+        }
+
+        .play-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loop-btn {
+            background-color: transparent;
+            color: #666;
+            border: 1px solid #666;
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 1em;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .loop-btn:hover {
+            border-color: #888;
+            color: #888;
+        }
+
+        .loop-btn.active {
+            background-color: #004400;
+            color: #00ff00;
+            border-color: #00ff00;
+        }
+
+        .note.playing {
+            background-color: #444400;
+        }
+
+        .sustain-row {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin-bottom: 2px;
+        }
+
+        .sustain-toggle {
+            width: 2ch;
+            height: 1.2em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            color: #333;
+            font-size: 1em;
+            flex-shrink: 0;
+        }
+
+        .sustain-toggle:hover {
+            color: #666;
+        }
+
+        .sustain-toggle.active {
+            color: #00ff00;
+        }
+
+        /* Mobile responsive styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+                align-items: flex-start;
+            }
+
+            .container {
+                padding: 15px;
+                width: 100%;
+                overflow-x: auto;
+            }
+
+            h1 {
+                font-size: 1.5em;
+                margin-bottom: 15px;
+            }
+
+            .controls {
+                flex-wrap: wrap;
+                margin-bottom: 15px;
+            }
+
+            .staffs-container {
+                gap: 15px;
+            }
+
+            .staff {
+                min-width: max-content;
+            }
+
+            .note {
+                width: 2.5ch;
+                height: 2em;
+                font-size: 0.9em;
+            }
+
+            .sustain-toggle {
+                width: 2.5ch;
+                height: 1.5em;
+            }
+
+            .instructions {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .note {
+                width: 3ch;
+                height: 2.2em;
+            }
+
+            .sustain-toggle {
+                width: 3ch;
+                height: 1.8em;
+            }
+
+            .play-btn, .loop-btn {
+                padding: 10px 16px;
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Eddie</h1>
+        <div class="sample-songs-container">
+            <select class="waveform-select" id="sampleSongs" onchange="loadSampleSong(this.value)">
+                <option value="">Load a sample song...</option>
+            </select>
+        </div>
+        <div class="controls">
+            <button class="play-btn" id="playBtn" onclick="togglePlayback()">Play</button>
+            <button class="loop-btn active" id="loopBtn" onclick="toggleLoop()">Loop</button>
+            <button class="loop-btn" id="clearBtn" onclick="clearTab()">Clear</button>
+            <button class="loop-btn active" id="guitar2Btn" onclick="toggleGuitar2()">Guitar 2</button>
+            <button class="loop-btn" id="exportBtn" onclick="exportMidi()">Export MIDI</button>
+            <button class="loop-btn" id="exportWavBtn" onclick="exportWav()">Export WAV</button>
+            <label class="tempo-control">
+                <span>BPM:</span>
+                <input type="number" id="tempoInput" min="40" max="240" value="120" onchange="updateTempo(this.value)">
+            </label>
+        </div>
+        <div class="staffs-container" id="staffsContainer"></div>
+        <div class="instructions">
+            <p><kbd>Click</kbd> to select a position</p>
+            <p><kbd>0-9</kbd> Enter fret number (1-2 digits)</p>
+            <p><kbd>Enter</kbd> Exit edit mode</p>
+            <p><kbd>Space</kbd> / <kbd>&rarr;</kbd> Move right</p>
+            <p><kbd>&larr;</kbd> Move left</p>
+            <p><kbd>&uarr;</kbd> Move up</p>
+            <p><kbd>&darr;</kbd> Move down</p>
+        </div>
+    </div>
+
+    <script>
+        const STRING_LABELS = ['e', 'B', 'G', 'D', 'A', 'E'];
+        const NUM_POSITIONS = 40;
+        const NUM_STAFFS = 2;
+        const EN_DASH = '\u2013';
+
+        let selectedStaff = null;
+        let selectedString = null;
+        let selectedPosition = null;
+        let editMode = false;
+        let pendingDigit = null;
+        let guitar2Enabled = true;
+
+        // Waveform per guitar
+        const guitarWaveforms = ['triangle', 'triangle'];
+
+        // Sustain state per staff per position
+        const sustainState = Array.from({ length: NUM_STAFFS }, () =>
+            new Array(NUM_POSITIONS).fill(false)
+        );
+
+        function toggleSustain(staffIndex, position) {
+            sustainState[staffIndex][position] = !sustainState[staffIndex][position];
+            const toggle = document.querySelector(`.sustain-toggle[data-staff="${staffIndex}"][data-position="${position}"]`);
+            if (toggle) {
+                toggle.classList.toggle('active', sustainState[staffIndex][position]);
+            }
+            saveStateToUrl();
+        }
+
+        // Initialize all staffs
+        function initStaffs() {
+            const container = document.getElementById('staffsContainer');
+            container.innerHTML = '';
+
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                const staffWrapper = document.createElement('div');
+                staffWrapper.className = 'staff';
+                staffWrapper.dataset.staff = staffIndex;
+
+                // Guitar label with waveform selector
+                const staffLabel = document.createElement('div');
+                staffLabel.className = 'staff-label';
+
+                const labelText = document.createElement('span');
+                labelText.textContent = `Guitar ${staffIndex + 1}`;
+                staffLabel.appendChild(labelText);
+
+                const waveformSelect = document.createElement('select');
+                waveformSelect.className = 'waveform-select';
+                waveformSelect.dataset.staff = staffIndex;
+                ['sine', 'triangle', 'square', 'sawtooth'].forEach(waveform => {
+                    const option = document.createElement('option');
+                    option.value = waveform;
+                    option.textContent = waveform;
+                    if (waveform === guitarWaveforms[staffIndex]) {
+                        option.selected = true;
+                    }
+                    waveformSelect.appendChild(option);
+                });
+                waveformSelect.addEventListener('change', (e) => {
+                    guitarWaveforms[staffIndex] = e.target.value;
+                });
+                staffLabel.appendChild(waveformSelect);
+
+                staffWrapper.appendChild(staffLabel);
+
+                // Add sustain toggle row
+                const sustainRow = document.createElement('div');
+                sustainRow.className = 'sustain-row';
+
+                const sustainLabel = document.createElement('span');
+                sustainLabel.className = 'string-label';
+                sustainLabel.textContent = '';
+                sustainRow.appendChild(sustainLabel);
+
+                for (let pos = 0; pos < NUM_POSITIONS; pos++) {
+                    const toggle = document.createElement('span');
+                    toggle.className = 'sustain-toggle';
+                    toggle.textContent = '~';
+                    toggle.dataset.staff = staffIndex;
+                    toggle.dataset.position = pos;
+                    toggle.addEventListener('click', () => toggleSustain(staffIndex, pos));
+                    sustainRow.appendChild(toggle);
+                }
+                staffWrapper.appendChild(sustainRow);
+
+                STRING_LABELS.forEach((label, stringIndex) => {
+                    const stringRow = document.createElement('div');
+                    stringRow.className = 'string';
+
+                    const labelEl = document.createElement('span');
+                    labelEl.className = 'string-label';
+                    labelEl.textContent = label;
+                    stringRow.appendChild(labelEl);
+
+                    for (let pos = 0; pos < NUM_POSITIONS; pos++) {
+                        const note = document.createElement('span');
+                        note.className = 'note';
+                        note.textContent = EN_DASH;
+                        note.dataset.staff = staffIndex;
+                        note.dataset.string = stringIndex;
+                        note.dataset.position = pos;
+                        note.addEventListener('click', () => handleNoteClick(staffIndex, stringIndex, pos));
+                        stringRow.appendChild(note);
+                    }
+
+                    staffWrapper.appendChild(stringRow);
+                });
+
+                container.appendChild(staffWrapper);
+            }
+        }
+
+        const MAX_FRET = 24;
+
+        function getNoteElement(staffIndex, stringIndex, position) {
+            return document.querySelector(`.note[data-staff="${staffIndex}"][data-string="${stringIndex}"][data-position="${position}"]`);
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.note.selected').forEach(el => el.classList.remove('selected'));
+        }
+
+        function handleNoteClick(staffIndex, stringIndex, position) {
+            // If this note is already selected, increment the fret number
+            if (selectedStaff === staffIndex && selectedString === stringIndex && selectedPosition === position) {
+                incrementFret();
+            } else {
+                selectNote(staffIndex, stringIndex, position);
+            }
+        }
+
+        function incrementFret() {
+            if (selectedStaff === null || selectedString === null || selectedPosition === null) return;
+
+            const note = getNoteElement(selectedStaff, selectedString, selectedPosition);
+            if (!note) return;
+
+            const currentValue = note.textContent;
+            let newFret;
+
+            if (currentValue === EN_DASH) {
+                newFret = 0;
+            } else {
+                const currentFret = parseInt(currentValue);
+                if (isNaN(currentFret)) {
+                    newFret = 0;
+                } else if (currentFret >= MAX_FRET) {
+                    newFret = EN_DASH; // Wrap back to empty
+                } else {
+                    newFret = currentFret + 1;
+                }
+            }
+
+            note.textContent = newFret;
+            saveStateToUrl();
+        }
+
+        function selectNote(staffIndex, stringIndex, position) {
+            // Bounds checking
+            if (staffIndex < 0 || staffIndex >= NUM_STAFFS) return;
+            if (stringIndex < 0 || stringIndex >= STRING_LABELS.length) return;
+            if (position < 0 || position >= NUM_POSITIONS) return;
+
+            clearSelection();
+            selectedStaff = staffIndex;
+            selectedString = stringIndex;
+            selectedPosition = position;
+            editMode = true;
+            pendingDigit = null;
+
+            const note = getNoteElement(staffIndex, stringIndex, position);
+            if (note) {
+                note.classList.add('selected');
+            }
+        }
+
+        function exitEditMode() {
+            clearSelection();
+            selectedStaff = null;
+            selectedString = null;
+            selectedPosition = null;
+            editMode = false;
+            pendingDigit = null;
+        }
+
+        function setNoteValue(value) {
+            if (selectedStaff === null || selectedString === null || selectedPosition === null) return;
+
+            const note = getNoteElement(selectedStaff, selectedString, selectedPosition);
+            if (note) {
+                note.textContent = value;
+                saveStateToUrl();
+            }
+        }
+
+        // Serialize state to URL
+        // Format: staff0notes|staff1notes where notes are staff.string.position.value
+        // Sustain: s0:pos1,pos2|s1:pos1,pos2
+        function saveStateToUrl() {
+            const staffNotes = [];
+
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                const notes = [];
+                document.querySelectorAll(`.note[data-staff="${staffIndex}"]`).forEach(note => {
+                    const value = note.textContent;
+                    if (value !== EN_DASH) {
+                        const s = note.dataset.string;
+                        const p = note.dataset.position;
+                        notes.push(`${s}.${p}.${value}`);
+                    }
+                });
+                staffNotes.push(notes.join(','));
+            }
+
+            // Encode sustain positions per staff
+            const sustainParts = [];
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                const positions = sustainState[staffIndex]
+                    .map((active, pos) => active ? pos : -1)
+                    .filter(pos => pos >= 0);
+                if (positions.length > 0) {
+                    sustainParts.push(`s${staffIndex}:${positions.join(',')}`);
+                }
+            }
+
+            let stateStr = staffNotes.join('|');
+            if (sustainParts.length > 0) {
+                stateStr += ';' + sustainParts.join('|');
+            }
+
+            // Only save if there's actual content
+            const hasContent = staffNotes.some(s => s.length > 0) || sustainParts.length > 0;
+            if (hasContent) {
+                const encoded = encodeURIComponent(stateStr);
+                history.replaceState(null, '', '#' + encoded);
+            } else {
+                history.replaceState(null, '', window.location.pathname);
+            }
+        }
+
+        // Restore state from URL
+        function loadStateFromUrl() {
+            const hash = window.location.hash.slice(1);
+            if (!hash) return;
+
+            try {
+                const state = decodeURIComponent(hash);
+                const mainParts = state.split(';');
+
+                // Parse notes (first part before ;)
+                if (mainParts[0]) {
+                    const staffNoteParts = mainParts[0].split('|');
+                    staffNoteParts.forEach((staffNotes, staffIndex) => {
+                        if (staffIndex >= NUM_STAFFS || !staffNotes) return;
+                        const notes = staffNotes.split(',');
+                        notes.forEach(noteData => {
+                            if (!noteData) return;
+                            const [s, p, value] = noteData.split('.');
+                            const note = getNoteElement(staffIndex, parseInt(s), parseInt(p));
+                            if (note && value) {
+                                note.textContent = value;
+                            }
+                        });
+                    });
+                }
+
+                // Parse sustain (second part after ;)
+                if (mainParts[1]) {
+                    const sustainParts = mainParts[1].split('|');
+                    sustainParts.forEach(part => {
+                        const match = part.match(/^s(\d+):(.*)$/);
+                        if (match) {
+                            const staffIndex = parseInt(match[1]);
+                            if (staffIndex >= NUM_STAFFS) return;
+                            const positions = match[2].split(',');
+                            positions.forEach(pos => {
+                                const p = parseInt(pos);
+                                if (!isNaN(p) && p >= 0 && p < NUM_POSITIONS) {
+                                    sustainState[staffIndex][p] = true;
+                                    const toggle = document.querySelector(`.sustain-toggle[data-staff="${staffIndex}"][data-position="${p}"]`);
+                                    if (toggle) toggle.classList.add('active');
+                                }
+                            });
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to load state from URL:', e);
+            }
+        }
+
+        function moveRight() {
+            if (selectedStaff === null || selectedString === null || selectedPosition === null) return;
+            if (selectedPosition < NUM_POSITIONS - 1) {
+                selectNote(selectedStaff, selectedString, selectedPosition + 1);
+            }
+        }
+
+        function moveLeft() {
+            if (selectedStaff === null || selectedString === null || selectedPosition === null) return;
+            if (selectedPosition > 0) {
+                selectNote(selectedStaff, selectedString, selectedPosition - 1);
+            }
+        }
+
+        function moveUp() {
+            if (selectedStaff === null || selectedString === null || selectedPosition === null) return;
+            if (selectedString > 0) {
+                selectNote(selectedStaff, selectedString - 1, selectedPosition);
+            } else if (selectedStaff > 0) {
+                // Move to previous staff, last string
+                selectNote(selectedStaff - 1, STRING_LABELS.length - 1, selectedPosition);
+            }
+        }
+
+        function moveDown() {
+            if (selectedStaff === null || selectedString === null || selectedPosition === null) return;
+            if (selectedString < STRING_LABELS.length - 1) {
+                selectNote(selectedStaff, selectedString + 1, selectedPosition);
+            } else if (selectedStaff < NUM_STAFFS - 1) {
+                // Move to next staff, first string
+                selectNote(selectedStaff + 1, 0, selectedPosition);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (!editMode) return;
+
+            // Handle digit input
+            if (e.key >= '0' && e.key <= '9') {
+                e.preventDefault();
+
+                if (pendingDigit !== null) {
+                    // Second digit - create two-digit fret number
+                    const fret = pendingDigit * 10 + parseInt(e.key);
+                    setNoteValue(fret.toString());
+                    pendingDigit = null;
+                    moveRight();
+                } else {
+                    // First digit - set it and wait for potential second digit
+                    pendingDigit = parseInt(e.key);
+                    setNoteValue(e.key);
+                }
+                return;
+            }
+
+            // Any non-digit key commits the pending digit
+            if (pendingDigit !== null) {
+                pendingDigit = null;
+            }
+
+            switch (e.key) {
+                case 'Enter':
+                    e.preventDefault();
+                    exitEditMode();
+                    break;
+                case ' ':
+                case 'ArrowRight':
+                    e.preventDefault();
+                    moveRight();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    moveLeft();
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    moveUp();
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    moveDown();
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    exitEditMode();
+                    break;
+                case 'Backspace':
+                case '-':
+                    e.preventDefault();
+                    setNoteValue(EN_DASH);
+                    break;
+            }
+        });
+
+        // Click outside to deselect
+        document.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('note')) {
+                exitEditMode();
+            }
+        });
+
+        // ========== PLAYBACK ==========
+
+        // Standard tuning open string frequencies (high e to low E)
+        const STRING_FREQUENCIES = [
+            329.63,  // e4
+            246.94,  // B3
+            196.00,  // G3
+            146.83,  // D3
+            110.00,  // A2
+            82.41    // E2
+        ];
+
+        let audioCtx = null;
+        let isPlaying = false;
+        let loopEnabled = true;
+        let playbackTimeout = null;
+
+        // Track active sustained notes per staff per string
+        const activeNotes = Array.from({ length: NUM_STAFFS }, () =>
+            new Array(STRING_LABELS.length).fill(null)
+        );
+
+        let tempoBpm = 120;
+
+        function getQuarterNoteMs() {
+            return 60000 / tempoBpm;
+        }
+
+        function updateTempo(value) {
+            const bpm = parseInt(value);
+            if (!isNaN(bpm) && bpm >= 40 && bpm <= 240) {
+                tempoBpm = bpm;
+            }
+        }
+
+        function toggleLoop() {
+            loopEnabled = !loopEnabled;
+            document.getElementById('loopBtn').classList.toggle('active', loopEnabled);
+        }
+
+        function toggleGuitar2() {
+            guitar2Enabled = !guitar2Enabled;
+            document.getElementById('guitar2Btn').classList.toggle('active', guitar2Enabled);
+            const guitar2Staff = document.querySelector('.staff[data-staff="1"]');
+            if (guitar2Staff) {
+                guitar2Staff.style.display = guitar2Enabled ? '' : 'none';
+            }
+        }
+
+        function clearTab() {
+            stopPlayback();
+            document.querySelectorAll('.note').forEach(note => {
+                note.textContent = EN_DASH;
+            });
+            // Clear sustain state for all staffs
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                for (let i = 0; i < NUM_POSITIONS; i++) {
+                    sustainState[staffIndex][i] = false;
+                }
+            }
+            document.querySelectorAll('.sustain-toggle').forEach(toggle => {
+                toggle.classList.remove('active');
+            });
+            saveStateToUrl();
+        }
+
+        function getFrequency(stringIndex, fret) {
+            const openFreq = STRING_FREQUENCIES[stringIndex];
+            // Each fret is a semitone higher: freq * 2^(fret/12)
+            return openFreq * Math.pow(2, fret / 12);
+        }
+
+        // Gain adjustments to normalize perceived volume across waveforms
+        const WAVEFORM_GAINS = {
+            sine: 0.35,
+            triangle: 0.3,
+            square: 0.15,
+            sawtooth: 0.2
+        };
+
+        function playNote(frequency, duration, sustain = false, waveform = 'triangle') {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.type = waveform;
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            const baseGain = WAVEFORM_GAINS[waveform] || 0.3;
+            const now = audioCtx.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(baseGain, now + 0.01);
+
+            oscillator.start(now);
+
+            if (sustain) {
+                // Sustain: hold at slightly reduced gain, will be stopped manually
+                gainNode.gain.setValueAtTime(baseGain * 0.8, now + 0.02);
+            } else {
+                // Quick attack, gradual decay for plucked string feel
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration / 1000);
+                oscillator.stop(now + duration / 1000);
+            }
+
+            // Return a stop function for sustained notes
+            let stopped = false;
+            return {
+                stop: () => {
+                    if (stopped) return;
+                    stopped = true;
+                    try {
+                        const stopTime = audioCtx.currentTime;
+                        gainNode.gain.cancelScheduledValues(stopTime);
+                        gainNode.gain.setValueAtTime(Math.max(gainNode.gain.value, 0.01), stopTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, stopTime + 0.05);
+                        oscillator.stop(stopTime + 0.06);
+                    } catch (e) {
+                        // Oscillator may already be stopped
+                    }
+                }
+            };
+        }
+
+        function stopActiveNote(staffIndex, stringIndex) {
+            if (activeNotes[staffIndex][stringIndex]) {
+                try {
+                    activeNotes[staffIndex][stringIndex].stop();
+                } catch (e) {
+                    // Already stopped
+                }
+                activeNotes[staffIndex][stringIndex] = null;
+            }
+        }
+
+        function stopAllActiveNotesForStaff(staffIndex) {
+            for (let i = 0; i < STRING_LABELS.length; i++) {
+                stopActiveNote(staffIndex, i);
+            }
+        }
+
+        function stopAllActiveNotes() {
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                stopAllActiveNotesForStaff(staffIndex);
+            }
+        }
+
+        function clearPlayhead() {
+            document.querySelectorAll('.note.playing').forEach(el => el.classList.remove('playing'));
+        }
+
+        function findLastNotePosition() {
+            let lastPos = -1;
+            document.querySelectorAll('.note').forEach(note => {
+                // Skip Guitar 2 notes if disabled
+                if (note.dataset.staff === '1' && !guitar2Enabled) return;
+
+                if (note.textContent !== EN_DASH) {
+                    const pos = parseInt(note.dataset.position);
+                    if (pos > lastPos) lastPos = pos;
+                }
+            });
+            return lastPos;
+        }
+
+        function playPosition(position, lastPosition) {
+            if (!isPlaying) return;
+
+            clearPlayhead();
+
+            // If we've passed the last note, either loop or stop
+            if (position > lastPosition) {
+                stopAllActiveNotes();
+                if (loopEnabled) {
+                    playPosition(0, lastPosition);
+                    return;
+                } else {
+                    stopPlayback();
+                    return;
+                }
+            }
+
+            // Play notes from all staffs at this position
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                // Skip Guitar 2 if disabled
+                if (staffIndex === 1 && !guitar2Enabled) continue;
+
+                const isSustained = sustainState[staffIndex][position];
+
+                // Check if this position has any notes on this staff
+                let hasNotesAtPosition = false;
+                for (let s = 0; s < STRING_LABELS.length; s++) {
+                    const note = getNoteElement(staffIndex, s, position);
+                    if (note && note.textContent !== EN_DASH) {
+                        hasNotesAtPosition = true;
+                        break;
+                    }
+                }
+
+                // If this position has notes and sustain is OFF, stop all sustained notes for this staff
+                if (hasNotesAtPosition && !isSustained) {
+                    stopAllActiveNotesForStaff(staffIndex);
+                }
+
+                for (let s = 0; s < STRING_LABELS.length; s++) {
+                    const note = getNoteElement(staffIndex, s, position);
+                    if (note) {
+                        note.classList.add('playing');
+                        const value = note.textContent;
+                        if (value !== EN_DASH) {
+                            const fret = parseInt(value);
+                            if (!isNaN(fret)) {
+                                // Stop any previously sustained note on this string
+                                stopActiveNote(staffIndex, s);
+
+                                const waveform = guitarWaveforms[staffIndex];
+                                const noteHandle = playNote(getFrequency(s, fret), getQuarterNoteMs() * 0.9, isSustained, waveform);
+                                if (isSustained) {
+                                    activeNotes[staffIndex][s] = noteHandle;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Schedule next position
+            playbackTimeout = setTimeout(() => {
+                playPosition(position + 1, lastPosition);
+            }, getQuarterNoteMs());
+        }
+
+        function startPlayback() {
+            const lastPosition = findLastNotePosition();
+            if (lastPosition < 0) return; // No notes to play
+
+            isPlaying = true;
+            document.getElementById('playBtn').textContent = 'Stop';
+            exitEditMode();
+            playPosition(0, lastPosition);
+        }
+
+        function stopPlayback() {
+            isPlaying = false;
+            if (playbackTimeout) {
+                clearTimeout(playbackTimeout);
+                playbackTimeout = null;
+            }
+            stopAllActiveNotes();
+            clearPlayhead();
+            document.getElementById('playBtn').textContent = 'Play';
+        }
+
+        function togglePlayback() {
+            if (isPlaying) {
+                stopPlayback();
+            } else {
+                startPlayback();
+            }
+        }
+
+        // ========== MIDI EXPORT ==========
+
+        // MIDI note numbers for open strings (standard tuning)
+        const STRING_MIDI_NOTES = [64, 59, 55, 50, 45, 40]; // e4, B3, G3, D3, A2, E2
+
+        function exportMidi() {
+            const lastPos = findLastNotePosition();
+            if (lastPos < 0) {
+                alert('No notes to export!');
+                return;
+            }
+
+            // Collect all notes from enabled staffs
+            const ticksPerBeat = 480;
+            const tracks = [];
+
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                if (staffIndex === 1 && !guitar2Enabled) continue;
+
+                const events = [];
+
+                for (let pos = 0; pos <= lastPos; pos++) {
+                    const isSustained = sustainState[staffIndex][pos];
+                    const noteDuration = isSustained ? ticksPerBeat * 4 : ticksPerBeat; // Sustain = whole note, normal = quarter
+
+                    for (let s = 0; s < STRING_LABELS.length; s++) {
+                        const note = getNoteElement(staffIndex, s, pos);
+                        if (note && note.textContent !== EN_DASH) {
+                            const fret = parseInt(note.textContent);
+                            if (!isNaN(fret)) {
+                                const midiNote = STRING_MIDI_NOTES[s] + fret;
+                                const startTick = pos * ticksPerBeat;
+                                events.push({ type: 'noteOn', tick: startTick, note: midiNote, velocity: 80 });
+                                events.push({ type: 'noteOff', tick: startTick + noteDuration, note: midiNote, velocity: 0 });
+                            }
+                        }
+                    }
+                }
+
+                if (events.length > 0) {
+                    tracks.push(events);
+                }
+            }
+
+            if (tracks.length === 0) {
+                alert('No notes to export!');
+                return;
+            }
+
+            const midiData = buildMidiFile(tracks, ticksPerBeat);
+            downloadMidi(midiData, 'eddie-tab.mid');
+        }
+
+        function buildMidiFile(tracks, ticksPerBeat) {
+            const bytes = [];
+
+            // Header chunk
+            writeString(bytes, 'MThd');
+            writeUint32(bytes, 6); // Header length
+            writeUint16(bytes, 1); // Format 1 (multiple tracks)
+            writeUint16(bytes, tracks.length + 1); // Number of tracks (+1 for tempo track)
+            writeUint16(bytes, ticksPerBeat); // Ticks per quarter note
+
+            // Tempo track
+            const tempoTrack = [];
+            // Tempo in microseconds per beat = 60,000,000 / BPM
+            const microsecondsPerBeat = Math.round(60000000 / tempoBpm);
+            tempoTrack.push(0x00, 0xFF, 0x51, 0x03,
+                (microsecondsPerBeat >> 16) & 0xFF,
+                (microsecondsPerBeat >> 8) & 0xFF,
+                microsecondsPerBeat & 0xFF);
+            // End of track
+            tempoTrack.push(0x00, 0xFF, 0x2F, 0x00);
+
+            writeString(bytes, 'MTrk');
+            writeUint32(bytes, tempoTrack.length);
+            bytes.push(...tempoTrack);
+
+            // Note tracks
+            tracks.forEach((events, trackIndex) => {
+                const trackBytes = [];
+
+                // Sort events by tick, then noteOff before noteOn for same tick
+                events.sort((a, b) => {
+                    if (a.tick !== b.tick) return a.tick - b.tick;
+                    if (a.type === 'noteOff' && b.type === 'noteOn') return -1;
+                    if (a.type === 'noteOn' && b.type === 'noteOff') return 1;
+                    return 0;
+                });
+
+                // Track name
+                const trackName = `Guitar ${trackIndex + 1}`;
+                writeVarLen(trackBytes, 0);
+                trackBytes.push(0xFF, 0x03, trackName.length);
+                for (let i = 0; i < trackName.length; i++) {
+                    trackBytes.push(trackName.charCodeAt(i));
+                }
+
+                // Program change to acoustic guitar (channel = trackIndex, program 25)
+                writeVarLen(trackBytes, 0);
+                trackBytes.push(0xC0 | trackIndex, 25);
+
+                let lastTick = 0;
+                events.forEach(event => {
+                    const delta = event.tick - lastTick;
+                    writeVarLen(trackBytes, delta);
+
+                    if (event.type === 'noteOn') {
+                        trackBytes.push(0x90 | trackIndex, event.note, event.velocity);
+                    } else {
+                        trackBytes.push(0x80 | trackIndex, event.note, 0);
+                    }
+                    lastTick = event.tick;
+                });
+
+                // End of track
+                writeVarLen(trackBytes, 0);
+                trackBytes.push(0xFF, 0x2F, 0x00);
+
+                writeString(bytes, 'MTrk');
+                writeUint32(bytes, trackBytes.length);
+                bytes.push(...trackBytes);
+            });
+
+            return new Uint8Array(bytes);
+        }
+
+        function writeString(bytes, str) {
+            for (let i = 0; i < str.length; i++) {
+                bytes.push(str.charCodeAt(i));
+            }
+        }
+
+        function writeUint32(bytes, value) {
+            bytes.push((value >> 24) & 0xFF);
+            bytes.push((value >> 16) & 0xFF);
+            bytes.push((value >> 8) & 0xFF);
+            bytes.push(value & 0xFF);
+        }
+
+        function writeUint16(bytes, value) {
+            bytes.push((value >> 8) & 0xFF);
+            bytes.push(value & 0xFF);
+        }
+
+        function writeVarLen(bytes, value) {
+            const buffer = [];
+            buffer.push(value & 0x7F);
+            value >>= 7;
+            while (value > 0) {
+                buffer.push((value & 0x7F) | 0x80);
+                value >>= 7;
+            }
+            for (let i = buffer.length - 1; i >= 0; i--) {
+                bytes.push(buffer[i]);
+            }
+        }
+
+        function downloadMidi(data, filename) {
+            const blob = new Blob([data], { type: 'audio/midi' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ========== WAV EXPORT ==========
+
+        async function exportWav() {
+            const lastPos = findLastNotePosition();
+            if (lastPos < 0) {
+                alert('No notes to export!');
+                return;
+            }
+
+            const quarterNoteMs = getQuarterNoteMs();
+            const sampleRate = 44100;
+            const duration = ((lastPos + 1) * quarterNoteMs) / 1000 + 1; // Add 1 second for decay
+            const offlineCtx = new OfflineAudioContext(2, sampleRate * duration, sampleRate);
+
+            // Render all notes
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                if (staffIndex === 1 && !guitar2Enabled) continue;
+
+                for (let pos = 0; pos <= lastPos; pos++) {
+                    const isSustained = sustainState[staffIndex][pos];
+                    const noteDuration = isSustained ? quarterNoteMs * 4 : quarterNoteMs * 0.9;
+                    const startTime = (pos * quarterNoteMs) / 1000;
+
+                    for (let s = 0; s < STRING_LABELS.length; s++) {
+                        const note = getNoteElement(staffIndex, s, pos);
+                        if (note && note.textContent !== EN_DASH) {
+                            const fret = parseInt(note.textContent);
+                            if (!isNaN(fret)) {
+                                const frequency = getFrequency(s, fret);
+                                const waveform = guitarWaveforms[staffIndex];
+                                renderNoteToContext(offlineCtx, frequency, startTime, noteDuration / 1000, waveform);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Render and download
+            const renderedBuffer = await offlineCtx.startRendering();
+            const wavData = audioBufferToWav(renderedBuffer);
+            downloadWav(wavData, 'eddie-tab.wav');
+        }
+
+        function renderNoteToContext(ctx, frequency, startTime, duration, waveform) {
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
+
+            oscillator.type = waveform;
+            oscillator.frequency.setValueAtTime(frequency, startTime);
+
+            const baseGain = WAVEFORM_GAINS[waveform] || 0.3;
+            gainNode.gain.setValueAtTime(0, startTime);
+            gainNode.gain.linearRampToValueAtTime(baseGain, startTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+            oscillator.start(startTime);
+            oscillator.stop(startTime + duration);
+        }
+
+        function audioBufferToWav(buffer) {
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = 1; // PCM
+            const bitDepth = 16;
+
+            const bytesPerSample = bitDepth / 8;
+            const blockAlign = numChannels * bytesPerSample;
+
+            const samples = buffer.length;
+            const dataSize = samples * blockAlign;
+            const bufferSize = 44 + dataSize;
+
+            const arrayBuffer = new ArrayBuffer(bufferSize);
+            const view = new DataView(arrayBuffer);
+
+            // WAV header
+            writeWavString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeWavString(view, 8, 'WAVE');
+            writeWavString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // fmt chunk size
+            view.setUint16(20, format, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * blockAlign, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitDepth, true);
+            writeWavString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // Interleave channels and write samples
+            const channelData = [];
+            for (let ch = 0; ch < numChannels; ch++) {
+                channelData.push(buffer.getChannelData(ch));
+            }
+
+            let offset = 44;
+            for (let i = 0; i < samples; i++) {
+                for (let ch = 0; ch < numChannels; ch++) {
+                    let sample = channelData[ch][i];
+                    sample = Math.max(-1, Math.min(1, sample));
+                    sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                    view.setInt16(offset, sample, true);
+                    offset += 2;
+                }
+            }
+
+            return new Uint8Array(arrayBuffer);
+        }
+
+        function writeWavString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        function downloadWav(data, filename) {
+            const blob = new Blob([data], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ========== SAMPLE SONGS ==========
+
+        async function initSampleSongs() {
+            const select = document.getElementById('sampleSongs');
+            try {
+                const response = await fetch('songs.json');
+                const songs = await response.json();
+                songs.forEach(song => {
+                    const option = document.createElement('option');
+                    option.value = song.hash;
+                    option.textContent = song.name;
+                    select.appendChild(option);
+                });
+            } catch (e) {
+                // songs.json not available (e.g., file:// protocol)
+                console.log('Could not load songs.json:', e.message);
+            }
+        }
+
+        function loadSampleSong(hash) {
+            if (!hash) return;
+
+            // Clear current state
+            clearTab();
+
+            // Load the song from hash
+            window.location.hash = hash;
+            loadStateFromUrl();
+
+            // Reset dropdown
+            document.getElementById('sampleSongs').value = '';
+        }
+
+        // Initialize on load
+        initStaffs();
+        initSampleSongs();
+        loadStateFromUrl();
+    </script>
+</body>
+</html>
