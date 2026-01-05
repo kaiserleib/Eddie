@@ -1862,55 +1862,56 @@
             // Chord sustain pattern: 0 = none, 1 = root only, 2 = every other
             const sustainPattern = Math.floor(Math.random() * 3);
 
-            // Build the song: 2 repetitions of a 4-chord progression (32 beats total)
+            // Chord rhythm: 2 = half notes (every 2 beats), 4 = whole notes (every 4 beats)
+            const beatsPerChord = Math.random() < 0.5 ? 2 : 4;
+
+            // Build the song: fill 32 beats with the progression
             const notes = [];
             const sustains = [];
             let position = 0;
             let chordCount = 0;
 
-            for (let rep = 0; rep < 2; rep++) {
-                for (let i = 0; i < 4; i++) {
-                    const chordIdx = progression[i];
-                    const chordName = key.chords[chordIdx % key.chords.length];
-                    const chordNotes = CHORDS[chordName];
-                    const melodyNotes = MELODY[chordName];
+            while (position < 32) {
+                const chordIdx = progression[chordCount % progression.length];
+                const chordName = key.chords[chordIdx % key.chords.length];
+                const chordNotes = CHORDS[chordName];
+                const melodyNotes = MELODY[chordName];
 
-                    // Place chord on guitar 1 (staff 0) at start of bar
-                    if (chordNotes) {
-                        for (const note of chordNotes) {
-                            notes.push({ staff: 0, string: note.string, position: position, fret: note.fret });
-                        }
-                        // Sustain based on pattern
-                        const shouldSustain =
-                            (sustainPattern === 1 && chordCount === 0) ||  // root only
-                            (sustainPattern === 2 && chordCount % 2 === 0); // every other
-                        if (shouldSustain) {
-                            sustains.push({ staff: 0, position: position });
-                        }
+                // Place chord on guitar 1 (staff 0)
+                if (chordNotes) {
+                    for (const note of chordNotes) {
+                        notes.push({ staff: 0, string: note.string, position: position, fret: note.fret });
                     }
-                    chordCount++;
-
-                    // Generate melody on guitar 2 (staff 1) - 4 beats per chord
-                    let lastMelodyIdx = -1;
-                    for (let beat = 0; beat < 4; beat++) {
-                        // Pick a melody note, try to avoid immediate repetition
-                        let melodyIdx;
-                        do {
-                            melodyIdx = Math.floor(Math.random() * melodyNotes.length);
-                        } while (melodyIdx === lastMelodyIdx && melodyNotes.length > 1);
-                        lastMelodyIdx = melodyIdx;
-
-                        const tone = melodyNotes[melodyIdx];
-                        notes.push({ staff: 1, string: tone.s, position: position + beat, fret: tone.f });
-
-                        // Sustain some notes for legato feel
-                        if (Math.random() < 0.25) {
-                            sustains.push({ staff: 1, position: position + beat });
-                        }
+                    // Sustain based on pattern
+                    const shouldSustain =
+                        (sustainPattern === 1 && chordCount === 0) ||  // root only
+                        (sustainPattern === 2 && chordCount % 2 === 0); // every other
+                    if (shouldSustain) {
+                        sustains.push({ staff: 0, position: position });
                     }
-
-                    position += 4;
                 }
+                chordCount++;
+
+                // Generate melody on guitar 2 (staff 1) - one note per beat
+                let lastMelodyIdx = -1;
+                for (let beat = 0; beat < beatsPerChord; beat++) {
+                    // Pick a melody note, try to avoid immediate repetition
+                    let melodyIdx;
+                    do {
+                        melodyIdx = Math.floor(Math.random() * melodyNotes.length);
+                    } while (melodyIdx === lastMelodyIdx && melodyNotes.length > 1);
+                    lastMelodyIdx = melodyIdx;
+
+                    const tone = melodyNotes[melodyIdx];
+                    notes.push({ staff: 1, string: tone.s, position: position + beat, fret: tone.f });
+
+                    // Sustain some notes for legato feel
+                    if (Math.random() < 0.25) {
+                        sustains.push({ staff: 1, position: position + beat });
+                    }
+                }
+
+                position += beatsPerChord;
             }
 
             // Clear and load the generated song
