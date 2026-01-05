@@ -456,6 +456,169 @@
             return { encode, decode };
         })();
 
+        // Chord-based binary packing for better compression
+        // Format: 'C' prefix + chord dictionary + position references + sustains
+        const PackChord = (function() {
+            const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+            const B64_REV = {};
+            for (let i = 0; i < 64; i++) B64_REV[B64[i]] = i;
+
+            function encode(notes, sustains) {
+                // Group notes by staff+position into chords
+                const chordsByPosition = new Map();
+                for (const n of notes) {
+                    const key = n.staff * 1000 + n.position;
+                    if (!chordsByPosition.has(key)) {
+                        chordsByPosition.set(key, { staff: n.staff, position: n.position, notes: [] });
+                    }
+                    chordsByPosition.get(key).notes.push({ string: n.string, fret: n.fret });
+                }
+
+                // Build chord dictionary (unique shapes)
+                const shapeToId = new Map();
+                const shapes = [];
+                for (const chord of chordsByPosition.values()) {
+                    const sorted = [...chord.notes].sort((a, b) => a.string - b.string);
+                    const shapeKey = sorted.map(s => s.string + ':' + s.fret).join(',');
+                    if (!shapeToId.has(shapeKey)) {
+                        shapeToId.set(shapeKey, shapes.length);
+                        shapes.push(sorted);
+                    }
+                    chord.shapeId = shapeToId.get(shapeKey);
+                }
+
+                const numChords = shapes.length;
+                const chordIdBits = Math.max(1, Math.ceil(Math.log2(Math.max(numChords, 2))));
+
+                const bits = [];
+
+                // Write chord count (5 bits, max 31)
+                for (let i = 4; i >= 0; i--) bits.push((numChords >> i) & 1);
+
+                // Write each chord shape
+                for (const shape of shapes) {
+                    // Note count in this chord (3 bits, max 6)
+                    for (let i = 2; i >= 0; i--) bits.push((shape.length >> i) & 1);
+                    // Each note: string (3 bits) + fret (5 bits)
+                    for (const note of shape) {
+                        for (let i = 2; i >= 0; i--) bits.push((note.string >> i) & 1);
+                        for (let i = 4; i >= 0; i--) bits.push((note.fret >> i) & 1);
+                    }
+                }
+
+                // Write position count (8 bits, max 255)
+                const positions = Array.from(chordsByPosition.values());
+                for (let i = 7; i >= 0; i--) bits.push((positions.length >> i) & 1);
+
+                // Write each position reference: staff (1) + position (6) + chordId (variable)
+                for (const pos of positions) {
+                    bits.push(pos.staff & 1);
+                    for (let i = 5; i >= 0; i--) bits.push((pos.position >> i) & 1);
+                    for (let i = chordIdBits - 1; i >= 0; i--) bits.push((pos.shapeId >> i) & 1);
+                }
+
+                // Write sustain count (8 bits, max 255)
+                const sc = sustains.length;
+                for (let i = 7; i >= 0; i--) bits.push((sc >> i) & 1);
+
+                // Write each sustain (7 bits each)
+                for (const s of sustains) {
+                    bits.push(s.staff & 1);
+                    for (let i = 5; i >= 0; i--) bits.push((s.position >> i) & 1);
+                }
+
+                // Pad to multiple of 6 for base64
+                while (bits.length % 6 !== 0) bits.push(0);
+
+                // Convert to base64 with 'C' prefix
+                let result = 'C';
+                for (let i = 0; i < bits.length; i += 6) {
+                    const val = (bits[i] << 5) | (bits[i+1] << 4) | (bits[i+2] << 3) |
+                                (bits[i+3] << 2) | (bits[i+4] << 1) | bits[i+5];
+                    result += B64[val];
+                }
+                return result;
+            }
+
+            function decode(str) {
+                if (!str || str[0] !== 'C') return null;
+                str = str.slice(1); // Remove 'C' prefix
+
+                // Convert base64 to bits
+                const bits = [];
+                for (const c of str) {
+                    const val = B64_REV[c];
+                    if (val === undefined) return null;
+                    for (let i = 5; i >= 0; i--) bits.push((val >> i) & 1);
+                }
+
+                let pos = 0;
+                function readBits(n) {
+                    let val = 0;
+                    for (let i = 0; i < n; i++) val = (val << 1) | (bits[pos++] || 0);
+                    return val;
+                }
+
+                // Read chord count
+                const numChords = readBits(5);
+                if (numChords > 31) return null;
+
+                const chordIdBits = Math.max(1, Math.ceil(Math.log2(Math.max(numChords, 2))));
+
+                // Read chord shapes
+                const shapes = [];
+                for (let i = 0; i < numChords; i++) {
+                    const noteCount = readBits(3);
+                    const shape = [];
+                    for (let j = 0; j < noteCount; j++) {
+                        shape.push({
+                            string: readBits(3),
+                            fret: readBits(5)
+                        });
+                    }
+                    shapes.push(shape);
+                }
+
+                // Read position count
+                const positionCount = readBits(8);
+                if (positionCount > 255) return null;
+
+                // Read positions and expand to notes
+                const notes = [];
+                for (let i = 0; i < positionCount; i++) {
+                    const staff = readBits(1);
+                    const position = readBits(6);
+                    const shapeId = readBits(chordIdBits);
+                    const shape = shapes[shapeId] || [];
+                    for (const note of shape) {
+                        notes.push({
+                            staff,
+                            string: note.string,
+                            position,
+                            fret: note.fret
+                        });
+                    }
+                }
+
+                // Read sustain count
+                const sustainCount = readBits(8);
+                if (sustainCount > 100) return null;
+
+                // Read sustains
+                const sustains = [];
+                for (let i = 0; i < sustainCount; i++) {
+                    sustains.push({
+                        staff: readBits(1),
+                        position: readBits(6)
+                    });
+                }
+
+                return { notes, sustains };
+            }
+
+            return { encode, decode };
+        })();
+
         let selectedStaff = null;
         let selectedString = null;
         let selectedPosition = null;
@@ -704,7 +867,10 @@
 
             // Only save if there's actual content
             if (notes.length > 0 || sustains.length > 0) {
-                const packed = Pack.encode(notes, sustains);
+                // Try both encodings and use the shorter one
+                const packedNote = Pack.encode(notes, sustains);
+                const packedChord = PackChord.encode(notes, sustains);
+                const packed = packedChord.length < packedNote.length ? packedChord : packedNote;
                 history.replaceState(null, '', '#' + packed);
             } else {
                 history.replaceState(null, '', window.location.pathname);
@@ -717,7 +883,26 @@
             if (!hash) return;
 
             try {
-                // Try binary packed format first
+                // Try chord-packed format first (starts with 'C')
+                const packedChord = PackChord.decode(hash);
+                if (packedChord) {
+                    // Load notes
+                    for (const n of packedChord.notes) {
+                        const note = getNoteElement(n.staff, n.string, n.position);
+                        if (note) note.textContent = n.fret;
+                    }
+                    // Load sustains
+                    for (const s of packedChord.sustains) {
+                        if (s.staff < NUM_STAFFS && s.position < NUM_POSITIONS) {
+                            sustainState[s.staff][s.position] = true;
+                            const toggle = document.querySelector(`.sustain-toggle[data-staff="${s.staff}"][data-position="${s.position}"]`);
+                            if (toggle) toggle.classList.add('active');
+                        }
+                    }
+                    return;
+                }
+
+                // Try note-by-note binary packed format
                 const packed = Pack.decode(hash);
                 if (packed) {
                     // Load notes
