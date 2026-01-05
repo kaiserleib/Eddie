@@ -273,8 +273,9 @@
             cursor: pointer;
             user-select: none;
             color: #333;
-            font-size: 0.8em;
+            font-size: 1em;
             flex-shrink: 0;
+            box-sizing: border-box;
         }
 
         .chord-checkbox:hover {
@@ -875,7 +876,7 @@
             const checkbox = document.querySelector(`.chord-checkbox[data-staff="${staffIndex}"][data-position="${position}"]`);
             if (checkbox) {
                 checkbox.classList.toggle('selected', chordSelectState[staffIndex][position]);
-                checkbox.textContent = chordSelectState[staffIndex][position] ? '☑' : '☐';
+                checkbox.textContent = chordSelectState[staffIndex][position] ? '●' : '·';
             }
         }
 
@@ -886,7 +887,7 @@
                     const checkbox = document.querySelector(`.chord-checkbox[data-staff="${staffIndex}"][data-position="${pos}"]`);
                     if (checkbox) {
                         checkbox.classList.remove('selected');
-                        checkbox.textContent = '☐';
+                        checkbox.textContent = '·';
                     }
                 }
             }
@@ -979,7 +980,7 @@
                 for (let pos = 0; pos < NUM_POSITIONS; pos++) {
                     const checkbox = document.createElement('span');
                     checkbox.className = 'chord-checkbox';
-                    checkbox.textContent = '☐';
+                    checkbox.textContent = '·';
                     checkbox.dataset.staff = staffIndex;
                     checkbox.dataset.position = pos;
                     checkbox.addEventListener('click', () => toggleChordSelect(staffIndex, pos));
