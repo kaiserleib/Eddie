@@ -252,6 +252,91 @@
             color: #00ff00;
         }
 
+        /* Chord mode styles */
+        .chord-select-row {
+            display: none;
+            align-items: center;
+            gap: 0;
+            margin-bottom: 2px;
+        }
+
+        .chord-mode-active .chord-select-row {
+            display: flex;
+        }
+
+        .chord-checkbox {
+            width: 2ch;
+            height: 1.2em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            color: #333;
+            font-size: 0.8em;
+            flex-shrink: 0;
+        }
+
+        .chord-checkbox:hover {
+            color: #666;
+        }
+
+        .chord-checkbox.selected {
+            color: #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        .chord-palette {
+            display: none;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        .chord-mode-active .chord-palette {
+            display: flex;
+        }
+
+        .chord-btn {
+            padding: 8px 12px;
+            background: #222;
+            color: #0f0;
+            border: 1px solid #0f0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9em;
+            min-width: 3em;
+        }
+
+        .chord-btn:hover {
+            background: #0f0;
+            color: #000;
+        }
+
+        .chord-btn.minor {
+            color: #0cf;
+            border-color: #0cf;
+        }
+
+        .chord-btn.minor:hover {
+            background: #0cf;
+            color: #000;
+        }
+
+        .chord-btn.seventh {
+            color: #fc0;
+            border-color: #fc0;
+        }
+
+        .chord-btn.seventh:hover {
+            background: #fc0;
+            color: #000;
+        }
+
         /* Mobile responsive styles */
         @media (max-width: 768px) {
             body {
@@ -289,7 +374,7 @@
                 font-size: 0.9em;
             }
 
-            .sustain-toggle {
+            .sustain-toggle, .chord-checkbox {
                 width: 2.5ch;
                 height: 1.5em;
             }
@@ -305,7 +390,7 @@
                 height: 2.2em;
             }
 
-            .sustain-toggle {
+            .sustain-toggle, .chord-checkbox {
                 width: 3ch;
                 height: 1.8em;
             }
@@ -331,6 +416,7 @@
             <button class="loop-btn active" id="loopBtn" onclick="toggleLoop()">Loop</button>
             <button class="loop-btn" id="clearBtn" onclick="clearTab()">Clear</button>
             <button class="loop-btn" id="arpeggioBtn" onclick="toggleArpeggio()">Strum</button>
+            <button class="loop-btn" id="chordModeBtn" onclick="toggleChordMode()">Chords</button>
             <button class="loop-btn active" id="guitar2Btn" onclick="toggleGuitar2()">Guitar 2</button>
             <button class="loop-btn" id="exportBtn" onclick="exportMidi()">Export MIDI</button>
             <button class="loop-btn" id="exportWavBtn" onclick="exportWav()">Export WAV</button>
@@ -339,6 +425,24 @@
                 <span>BPM:</span>
                 <input type="number" id="tempoInput" min="40" max="240" value="120" onchange="updateTempo(this.value)">
             </label>
+        </div>
+        <div class="chord-palette" id="chordPalette">
+            <button class="chord-btn" onclick="placeChord('C')">C</button>
+            <button class="chord-btn" onclick="placeChord('D')">D</button>
+            <button class="chord-btn" onclick="placeChord('E')">E</button>
+            <button class="chord-btn" onclick="placeChord('G')">G</button>
+            <button class="chord-btn" onclick="placeChord('A')">A</button>
+            <button class="chord-btn minor" onclick="placeChord('Am')">Am</button>
+            <button class="chord-btn minor" onclick="placeChord('Dm')">Dm</button>
+            <button class="chord-btn minor" onclick="placeChord('Em')">Em</button>
+            <button class="chord-btn seventh" onclick="placeChord('A7')">A7</button>
+            <button class="chord-btn seventh" onclick="placeChord('B7')">B7</button>
+            <button class="chord-btn seventh" onclick="placeChord('D7')">D7</button>
+            <button class="chord-btn seventh" onclick="placeChord('E7')">E7</button>
+            <button class="chord-btn seventh" onclick="placeChord('G7')">G7</button>
+            <button class="chord-btn" onclick="placeChord('F')">F</button>
+            <button class="chord-btn minor" onclick="placeChord('Fm')">Fm</button>
+            <button class="chord-btn minor" onclick="placeChord('Bm')">Bm</button>
         </div>
         <div class="staffs-container" id="staffsContainer"></div>
         <div class="instructions">
@@ -718,6 +822,7 @@
         let pendingDigit = null;
         let guitar2Enabled = true;
         let arpeggioEnabled = false;
+        let chordModeEnabled = false;
 
         // Waveform per guitar
         const guitarWaveforms = ['triangle', 'triangle'];
@@ -726,6 +831,95 @@
         const sustainState = Array.from({ length: NUM_STAFFS }, () =>
             new Array(NUM_POSITIONS).fill(false)
         );
+
+        // Chord selection state per staff per position
+        const chordSelectState = Array.from({ length: NUM_STAFFS }, () =>
+            new Array(NUM_POSITIONS).fill(false)
+        );
+
+        // Chord voicings for placement
+        const CHORD_VOICINGS = {
+            C:  [{string:0,fret:0},{string:1,fret:1},{string:2,fret:0},{string:3,fret:2},{string:4,fret:3}],
+            D:  [{string:0,fret:2},{string:1,fret:3},{string:2,fret:2},{string:3,fret:0}],
+            E:  [{string:0,fret:0},{string:1,fret:0},{string:2,fret:1},{string:3,fret:2},{string:4,fret:2},{string:5,fret:0}],
+            G:  [{string:0,fret:3},{string:1,fret:0},{string:2,fret:0},{string:3,fret:0},{string:4,fret:2},{string:5,fret:3}],
+            A:  [{string:0,fret:0},{string:1,fret:2},{string:2,fret:2},{string:3,fret:2},{string:4,fret:0}],
+            Am: [{string:0,fret:0},{string:1,fret:1},{string:2,fret:2},{string:3,fret:2},{string:4,fret:0}],
+            Dm: [{string:0,fret:1},{string:1,fret:3},{string:2,fret:2},{string:3,fret:0}],
+            Em: [{string:0,fret:0},{string:1,fret:0},{string:2,fret:0},{string:3,fret:2},{string:4,fret:2},{string:5,fret:0}],
+            A7: [{string:0,fret:0},{string:1,fret:2},{string:2,fret:0},{string:3,fret:2},{string:4,fret:0}],
+            B7: [{string:0,fret:2},{string:1,fret:0},{string:2,fret:2},{string:3,fret:1},{string:4,fret:2}],
+            D7: [{string:0,fret:2},{string:1,fret:1},{string:2,fret:2},{string:3,fret:0}],
+            E7: [{string:0,fret:0},{string:1,fret:0},{string:2,fret:1},{string:3,fret:0},{string:4,fret:2},{string:5,fret:0}],
+            G7: [{string:0,fret:1},{string:1,fret:0},{string:2,fret:0},{string:3,fret:0},{string:4,fret:2},{string:5,fret:3}],
+            F:  [{string:0,fret:1},{string:1,fret:1},{string:2,fret:2},{string:3,fret:3},{string:4,fret:3},{string:5,fret:1}],
+            Fm: [{string:0,fret:1},{string:1,fret:1},{string:2,fret:1},{string:3,fret:3},{string:4,fret:3},{string:5,fret:1}],
+            Bm: [{string:0,fret:2},{string:1,fret:3},{string:2,fret:4},{string:3,fret:4},{string:4,fret:2}],
+        };
+
+        function toggleChordMode() {
+            chordModeEnabled = !chordModeEnabled;
+            document.getElementById('chordModeBtn').classList.toggle('active', chordModeEnabled);
+            document.querySelector('.container').classList.toggle('chord-mode-active', chordModeEnabled);
+
+            // Clear selections when exiting chord mode
+            if (!chordModeEnabled) {
+                clearChordSelections();
+            }
+        }
+
+        function toggleChordSelect(staffIndex, position) {
+            if (!chordModeEnabled) return;
+
+            chordSelectState[staffIndex][position] = !chordSelectState[staffIndex][position];
+            const checkbox = document.querySelector(`.chord-checkbox[data-staff="${staffIndex}"][data-position="${position}"]`);
+            if (checkbox) {
+                checkbox.classList.toggle('selected', chordSelectState[staffIndex][position]);
+                checkbox.textContent = chordSelectState[staffIndex][position] ? '☑' : '☐';
+            }
+        }
+
+        function clearChordSelections() {
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                for (let pos = 0; pos < NUM_POSITIONS; pos++) {
+                    chordSelectState[staffIndex][pos] = false;
+                    const checkbox = document.querySelector(`.chord-checkbox[data-staff="${staffIndex}"][data-position="${pos}"]`);
+                    if (checkbox) {
+                        checkbox.classList.remove('selected');
+                        checkbox.textContent = '☐';
+                    }
+                }
+            }
+        }
+
+        function placeChord(chordName) {
+            const voicing = CHORD_VOICINGS[chordName];
+            if (!voicing) return;
+
+            // Place chord at all selected positions
+            for (let staffIndex = 0; staffIndex < NUM_STAFFS; staffIndex++) {
+                for (let pos = 0; pos < NUM_POSITIONS; pos++) {
+                    if (chordSelectState[staffIndex][pos]) {
+                        // Clear existing notes at this position
+                        for (let s = 0; s < STRING_LABELS.length; s++) {
+                            const note = getNoteElement(staffIndex, s, pos);
+                            if (note) note.textContent = EN_DASH;
+                        }
+                        // Place chord notes
+                        for (const n of voicing) {
+                            const note = getNoteElement(staffIndex, n.string, pos);
+                            if (note) note.textContent = n.fret;
+                        }
+                    }
+                }
+            }
+
+            // Clear selections after placing
+            clearChordSelections();
+
+            // Save state
+            saveStateToUrl();
+        }
 
         function toggleSustain(staffIndex, position) {
             sustainState[staffIndex][position] = !sustainState[staffIndex][position];
@@ -772,6 +966,26 @@
                 staffLabel.appendChild(waveformSelect);
 
                 staffWrapper.appendChild(staffLabel);
+
+                // Add chord select row (visible only in chord mode)
+                const chordSelectRow = document.createElement('div');
+                chordSelectRow.className = 'chord-select-row';
+
+                const chordSelectLabel = document.createElement('span');
+                chordSelectLabel.className = 'string-label';
+                chordSelectLabel.textContent = '';
+                chordSelectRow.appendChild(chordSelectLabel);
+
+                for (let pos = 0; pos < NUM_POSITIONS; pos++) {
+                    const checkbox = document.createElement('span');
+                    checkbox.className = 'chord-checkbox';
+                    checkbox.textContent = '☐';
+                    checkbox.dataset.staff = staffIndex;
+                    checkbox.dataset.position = pos;
+                    checkbox.addEventListener('click', () => toggleChordSelect(staffIndex, pos));
+                    chordSelectRow.appendChild(checkbox);
+                }
+                staffWrapper.appendChild(chordSelectRow);
 
                 // Add sustain toggle row
                 const sustainRow = document.createElement('div');
