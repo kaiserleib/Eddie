@@ -330,6 +330,7 @@
             <button class="play-btn" id="playBtn" onclick="togglePlayback()">Play</button>
             <button class="loop-btn active" id="loopBtn" onclick="toggleLoop()">Loop</button>
             <button class="loop-btn" id="clearBtn" onclick="clearTab()">Clear</button>
+            <button class="loop-btn" id="arpeggioBtn" onclick="toggleArpeggio()">Strum</button>
             <button class="loop-btn active" id="guitar2Btn" onclick="toggleGuitar2()">Guitar 2</button>
             <button class="loop-btn" id="exportBtn" onclick="exportMidi()">Export MIDI</button>
             <button class="loop-btn" id="exportWavBtn" onclick="exportWav()">Export WAV</button>
@@ -716,6 +717,7 @@
         let editMode = false;
         let pendingDigit = null;
         let guitar2Enabled = true;
+        let arpeggioEnabled = false;
 
         // Waveform per guitar
         const guitarWaveforms = ['triangle', 'triangle'];
@@ -1208,6 +1210,11 @@
             }
         }
 
+        function toggleArpeggio() {
+            arpeggioEnabled = !arpeggioEnabled;
+            document.getElementById('arpeggioBtn').classList.toggle('active', arpeggioEnabled);
+        }
+
         function clearTab() {
             stopPlayback();
             document.querySelectorAll('.note').forEach(note => {
@@ -1368,7 +1375,10 @@
                     stopAllActiveNotesForStaff(staffIndex);
                 }
 
-                for (let s = 0; s < STRING_LABELS.length; s++) {
+                // Strum from low E (string 5) to high e (string 0) for realistic guitar sound
+                const strumDelay = arpeggioEnabled ? 20 : 0; // ms between strings
+                for (let i = 0; i < STRING_LABELS.length; i++) {
+                    const s = 5 - i; // Start from low E (string 5) and go up
                     const note = getNoteElement(staffIndex, s, position);
                     if (note) {
                         note.classList.add('playing');
@@ -1376,14 +1386,19 @@
                         if (value !== EN_DASH) {
                             const fret = parseInt(value);
                             if (!isNaN(fret)) {
-                                // Stop any previously sustained note on this string
-                                stopActiveNote(staffIndex, s);
+                                // Schedule note with strum offset
+                                const delay = i * strumDelay;
+                                setTimeout(() => {
+                                    if (!isPlaying) return;
+                                    // Stop any previously sustained note on this string
+                                    stopActiveNote(staffIndex, s);
 
-                                const waveform = guitarWaveforms[staffIndex];
-                                const noteHandle = playNote(getFrequency(s, fret), getQuarterNoteMs() * 0.9, isSustained, waveform);
-                                if (isSustained) {
-                                    activeNotes[staffIndex][s] = noteHandle;
-                                }
+                                    const waveform = guitarWaveforms[staffIndex];
+                                    const noteHandle = playNote(getFrequency(s, fret), getQuarterNoteMs() * 0.9, isSustained, waveform);
+                                    if (isSustained) {
+                                        activeNotes[staffIndex][s] = noteHandle;
+                                    }
+                                }, delay);
                             }
                         }
                     }
