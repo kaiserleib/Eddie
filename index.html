@@ -1591,8 +1591,11 @@
                         soundtrackPlayCount++;
                         if (soundtrackPlayCount >= soundtrackTargetCount) {
                             // Generate new song (resets counter internally)
+                            // Note: generateRandomSong calls clearTab which stops playback
                             generateRandomSong();
-                            // Start playing the new song
+                            // Restore playing state and continue
+                            isPlaying = true;
+                            document.getElementById('playBtn').textContent = 'Stop';
                             const newLastPosition = findLastNotePosition();
                             playPosition(0, newLastPosition);
                             return;
