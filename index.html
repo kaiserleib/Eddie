@@ -1859,10 +1859,14 @@
             const key = KEYS[keyName];
             const progression = PROGRESSIONS[Math.floor(Math.random() * PROGRESSIONS.length)];
 
+            // Chord sustain pattern: 0 = none, 1 = root only, 2 = every other
+            const sustainPattern = Math.floor(Math.random() * 3);
+
             // Build the song: 2 repetitions of a 4-chord progression (32 beats total)
             const notes = [];
             const sustains = [];
             let position = 0;
+            let chordCount = 0;
 
             for (let rep = 0; rep < 2; rep++) {
                 for (let i = 0; i < 4; i++) {
@@ -1876,9 +1880,15 @@
                         for (const note of chordNotes) {
                             notes.push({ staff: 0, string: note.string, position: position, fret: note.fret });
                         }
-                        // Sustain the chord
-                        sustains.push({ staff: 0, position: position });
+                        // Sustain based on pattern
+                        const shouldSustain =
+                            (sustainPattern === 1 && chordCount === 0) ||  // root only
+                            (sustainPattern === 2 && chordCount % 2 === 0); // every other
+                        if (shouldSustain) {
+                            sustains.push({ staff: 0, position: position });
+                        }
                     }
+                    chordCount++;
 
                     // Generate melody on guitar 2 (staff 1) - 4 beats per chord
                     let lastMelodyIdx = -1;
