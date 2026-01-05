@@ -456,12 +456,57 @@
             return { encode, decode };
         })();
 
-        // Chord-based binary packing for better compression
-        // Format: 'C' prefix + chord dictionary + position references + sustains
+        // Chord-based binary packing with predefined chord dictionary
+        // Format: 'D' prefix + chord dictionary + position references + sustains
+        // Chord types: 0=predefined (5 bits ID), 1=single note (8 bits), 2=custom (3+8n bits)
         const PackChord = (function() {
             const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
             const B64_REV = {};
             for (let i = 0; i < 64; i++) B64_REV[B64[i]] = i;
+
+            // Predefined chord dictionary - common guitar voicings
+            // Strings: 0=e, 1=B, 2=G, 3=D, 4=A, 5=E (high to low)
+            const PREDEFINED = [
+                // Open major chords (0-4)
+                [{string:0,fret:0},{string:1,fret:1},{string:2,fret:0},{string:3,fret:2},{string:4,fret:3}],           // 0: C
+                [{string:0,fret:2},{string:1,fret:3},{string:2,fret:2},{string:3,fret:0}],                             // 1: D
+                [{string:0,fret:0},{string:1,fret:0},{string:2,fret:1},{string:3,fret:2},{string:4,fret:2},{string:5,fret:0}], // 2: E
+                [{string:0,fret:3},{string:1,fret:0},{string:2,fret:0},{string:3,fret:0},{string:4,fret:2},{string:5,fret:3}], // 3: G
+                [{string:0,fret:0},{string:1,fret:2},{string:2,fret:2},{string:3,fret:2},{string:4,fret:0}],           // 4: A
+                // Open minor chords (5-7)
+                [{string:0,fret:0},{string:1,fret:1},{string:2,fret:2},{string:3,fret:2},{string:4,fret:0}],           // 5: Am
+                [{string:0,fret:1},{string:1,fret:3},{string:2,fret:2},{string:3,fret:0}],                             // 6: Dm
+                [{string:0,fret:0},{string:1,fret:0},{string:2,fret:0},{string:3,fret:2},{string:4,fret:2},{string:5,fret:0}], // 7: Em
+                // 7th chords (8-12)
+                [{string:0,fret:0},{string:1,fret:2},{string:2,fret:0},{string:3,fret:2},{string:4,fret:0}],           // 8: A7
+                [{string:0,fret:2},{string:1,fret:0},{string:2,fret:2},{string:3,fret:1},{string:4,fret:2}],           // 9: B7
+                [{string:0,fret:2},{string:1,fret:1},{string:2,fret:2},{string:3,fret:0}],                             // 10: D7
+                [{string:0,fret:0},{string:1,fret:0},{string:2,fret:1},{string:3,fret:0},{string:4,fret:2},{string:5,fret:0}], // 11: E7
+                [{string:0,fret:1},{string:1,fret:0},{string:2,fret:0},{string:3,fret:0},{string:4,fret:2},{string:5,fret:3}], // 12: G7
+                // Barre chords (13-16)
+                [{string:0,fret:1},{string:1,fret:1},{string:2,fret:2},{string:3,fret:3},{string:4,fret:3},{string:5,fret:1}], // 13: F
+                [{string:0,fret:1},{string:1,fret:1},{string:2,fret:1},{string:3,fret:3},{string:4,fret:3},{string:5,fret:1}], // 14: Fm
+                [{string:0,fret:2},{string:1,fret:3},{string:2,fret:4},{string:3,fret:4},{string:4,fret:2}],           // 15: Bm
+                [{string:0,fret:0},{string:1,fret:0},{string:2,fret:2},{string:3,fret:2},{string:4,fret:2},{string:5,fret:0}], // 16: Asus2
+                // More common chords (17-23)
+                [{string:0,fret:0},{string:1,fret:0},{string:2,fret:0},{string:3,fret:2},{string:4,fret:0}],           // 17: Am7
+                [{string:0,fret:0},{string:1,fret:1},{string:2,fret:0},{string:3,fret:0},{string:4,fret:3}],           // 18: Cmaj7
+                [{string:0,fret:2},{string:1,fret:2},{string:2,fret:2},{string:3,fret:0}],                             // 19: Dsus4
+                [{string:0,fret:0},{string:1,fret:3},{string:2,fret:0},{string:3,fret:0},{string:4,fret:2},{string:5,fret:3}], // 20: Cadd9
+                [{string:0,fret:3},{string:1,fret:3},{string:2,fret:0},{string:3,fret:0},{string:4,fret:2},{string:5,fret:3}], // 21: G/B
+                [{string:0,fret:0},{string:1,fret:1},{string:2,fret:0},{string:3,fret:2},{string:4,fret:0}],           // 22: Am/E
+                [{string:0,fret:2},{string:1,fret:1},{string:2,fret:2},{string:3,fret:0},{string:4,fret:0}],           // 23: Dm/A
+            ];
+
+            // Build lookup from shape key to predefined ID
+            function shapeKey(notes) {
+                return [...notes].sort((a, b) => a.string - b.string)
+                    .map(n => n.string + ':' + n.fret).join(',');
+            }
+            const PREDEF_LOOKUP = {};
+            PREDEFINED.forEach((shape, id) => {
+                PREDEF_LOOKUP[shapeKey(shape)] = id;
+            });
 
             function encode(notes, sustains) {
                 // Group notes by staff+position into chords
@@ -474,17 +519,24 @@
                     chordsByPosition.get(key).notes.push({ string: n.string, fret: n.fret });
                 }
 
-                // Build chord dictionary (unique shapes)
+                // Build chord dictionary with predefined lookup
                 const shapeToId = new Map();
-                const shapes = [];
+                const shapes = []; // Each: { type: 'predef'|'single'|'custom', data: ... }
                 for (const chord of chordsByPosition.values()) {
                     const sorted = [...chord.notes].sort((a, b) => a.string - b.string);
-                    const shapeKey = sorted.map(s => s.string + ':' + s.fret).join(',');
-                    if (!shapeToId.has(shapeKey)) {
-                        shapeToId.set(shapeKey, shapes.length);
-                        shapes.push(sorted);
+                    const key = shapeKey(sorted);
+                    if (!shapeToId.has(key)) {
+                        const predefId = PREDEF_LOOKUP[key];
+                        if (predefId !== undefined) {
+                            shapes.push({ type: 'predef', id: predefId });
+                        } else if (sorted.length === 1) {
+                            shapes.push({ type: 'single', string: sorted[0].string, fret: sorted[0].fret });
+                        } else {
+                            shapes.push({ type: 'custom', notes: sorted });
+                        }
+                        shapeToId.set(key, shapes.length - 1);
                     }
-                    chord.shapeId = shapeToId.get(shapeKey);
+                    chord.shapeId = shapeToId.get(key);
                 }
 
                 const numChords = shapes.length;
@@ -495,14 +547,25 @@
                 // Write chord count (5 bits, max 31)
                 for (let i = 4; i >= 0; i--) bits.push((numChords >> i) & 1);
 
-                // Write each chord shape
+                // Write each chord shape with type prefix
                 for (const shape of shapes) {
-                    // Note count in this chord (3 bits, max 6)
-                    for (let i = 2; i >= 0; i--) bits.push((shape.length >> i) & 1);
-                    // Each note: string (3 bits) + fret (5 bits)
-                    for (const note of shape) {
-                        for (let i = 2; i >= 0; i--) bits.push((note.string >> i) & 1);
-                        for (let i = 4; i >= 0; i--) bits.push((note.fret >> i) & 1);
+                    if (shape.type === 'predef') {
+                        // Type 00 + 5-bit predefined ID = 7 bits
+                        bits.push(0, 0);
+                        for (let i = 4; i >= 0; i--) bits.push((shape.id >> i) & 1);
+                    } else if (shape.type === 'single') {
+                        // Type 01 + 3-bit string + 5-bit fret = 10 bits
+                        bits.push(0, 1);
+                        for (let i = 2; i >= 0; i--) bits.push((shape.string >> i) & 1);
+                        for (let i = 4; i >= 0; i--) bits.push((shape.fret >> i) & 1);
+                    } else {
+                        // Type 1 + 3-bit count + notes = 1 + 3 + 8n bits
+                        bits.push(1);
+                        for (let i = 2; i >= 0; i--) bits.push((shape.notes.length >> i) & 1);
+                        for (const note of shape.notes) {
+                            for (let i = 2; i >= 0; i--) bits.push((note.string >> i) & 1);
+                            for (let i = 4; i >= 0; i--) bits.push((note.fret >> i) & 1);
+                        }
                     }
                 }
 
@@ -530,8 +593,8 @@
                 // Pad to multiple of 6 for base64
                 while (bits.length % 6 !== 0) bits.push(0);
 
-                // Convert to base64 with 'C' prefix
-                let result = 'C';
+                // Convert to base64 with 'D' prefix (Dictionary format)
+                let result = 'D';
                 for (let i = 0; i < bits.length; i += 6) {
                     const val = (bits[i] << 5) | (bits[i+1] << 4) | (bits[i+2] << 3) |
                                 (bits[i+3] << 2) | (bits[i+4] << 1) | bits[i+5];
@@ -541,8 +604,13 @@
             }
 
             function decode(str) {
-                if (!str || str[0] !== 'C') return null;
-                str = str.slice(1); // Remove 'C' prefix
+                if (!str) return null;
+
+                // Handle both 'D' (new dictionary) and 'C' (old chord) formats
+                const prefix = str[0];
+                if (prefix !== 'D' && prefix !== 'C') return null;
+                const usePredefined = (prefix === 'D');
+                str = str.slice(1);
 
                 // Convert base64 to bits
                 const bits = [];
@@ -568,15 +636,37 @@
                 // Read chord shapes
                 const shapes = [];
                 for (let i = 0; i < numChords; i++) {
-                    const noteCount = readBits(3);
-                    const shape = [];
-                    for (let j = 0; j < noteCount; j++) {
-                        shape.push({
-                            string: readBits(3),
-                            fret: readBits(5)
-                        });
+                    if (usePredefined) {
+                        // New format with type prefixes
+                        const type1 = readBits(1);
+                        if (type1 === 0) {
+                            const type2 = readBits(1);
+                            if (type2 === 0) {
+                                // Predefined chord
+                                const predefId = readBits(5);
+                                shapes.push(PREDEFINED[predefId] || []);
+                            } else {
+                                // Single note
+                                shapes.push([{ string: readBits(3), fret: readBits(5) }]);
+                            }
+                        } else {
+                            // Custom chord
+                            const noteCount = readBits(3);
+                            const shape = [];
+                            for (let j = 0; j < noteCount; j++) {
+                                shape.push({ string: readBits(3), fret: readBits(5) });
+                            }
+                            shapes.push(shape);
+                        }
+                    } else {
+                        // Old 'C' format - no type prefixes
+                        const noteCount = readBits(3);
+                        const shape = [];
+                        for (let j = 0; j < noteCount; j++) {
+                            shape.push({ string: readBits(3), fret: readBits(5) });
+                        }
+                        shapes.push(shape);
                     }
-                    shapes.push(shape);
                 }
 
                 // Read position count
