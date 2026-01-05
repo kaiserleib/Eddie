@@ -324,6 +324,7 @@
             <select class="waveform-select" id="sampleSongs" onchange="loadSampleSong(this.value)">
                 <option value="">Load a sample song...</option>
             </select>
+            <button class="loop-btn" onclick="generateRandomSong()">Random</button>
         </div>
         <div class="controls">
             <button class="play-btn" id="playBtn" onclick="togglePlayback()">Play</button>
@@ -1805,6 +1806,123 @@
                 // songs.json not available (e.g., file:// protocol)
                 console.log('Could not load songs.json:', e.message);
             }
+        }
+
+        // Random song generator using music theory
+        function generateRandomSong() {
+            // Chord voicings (matching predefined chord IDs)
+            // Strings: 0=e, 1=B, 2=G, 3=D, 4=A, 5=E
+            const CHORDS = {
+                C:  [{string:0,fret:0},{string:1,fret:1},{string:2,fret:0},{string:3,fret:2},{string:4,fret:3}],
+                D:  [{string:0,fret:2},{string:1,fret:3},{string:2,fret:2},{string:3,fret:0}],
+                E:  [{string:0,fret:0},{string:1,fret:0},{string:2,fret:1},{string:3,fret:2},{string:4,fret:2},{string:5,fret:0}],
+                G:  [{string:0,fret:3},{string:1,fret:0},{string:2,fret:0},{string:3,fret:0},{string:4,fret:2},{string:5,fret:3}],
+                A:  [{string:0,fret:0},{string:1,fret:2},{string:2,fret:2},{string:3,fret:2},{string:4,fret:0}],
+                Am: [{string:0,fret:0},{string:1,fret:1},{string:2,fret:2},{string:3,fret:2},{string:4,fret:0}],
+                Dm: [{string:0,fret:1},{string:1,fret:3},{string:2,fret:2},{string:3,fret:0}],
+                Em: [{string:0,fret:0},{string:1,fret:0},{string:2,fret:0},{string:3,fret:2},{string:4,fret:2},{string:5,fret:0}],
+            };
+
+            // Melody notes that sound good over each chord (chord tones + passing tones)
+            const MELODY = {
+                C:  [{s:0,f:0},{s:0,f:3},{s:1,f:1},{s:1,f:0},{s:2,f:0}],
+                D:  [{s:0,f:2},{s:0,f:5},{s:1,f:3},{s:1,f:0},{s:2,f:2}],
+                E:  [{s:0,f:0},{s:0,f:4},{s:1,f:0},{s:1,f:5},{s:2,f:1}],
+                G:  [{s:0,f:3},{s:0,f:0},{s:1,f:0},{s:1,f:3},{s:2,f:0}],
+                A:  [{s:0,f:0},{s:0,f:5},{s:1,f:2},{s:1,f:5},{s:2,f:2}],
+                Am: [{s:0,f:0},{s:0,f:5},{s:1,f:1},{s:1,f:5},{s:2,f:2}],
+                Dm: [{s:0,f:1},{s:0,f:5},{s:1,f:3},{s:1,f:6},{s:2,f:2}],
+                Em: [{s:0,f:0},{s:0,f:3},{s:1,f:0},{s:1,f:3},{s:2,f:0}],
+            };
+
+            // Keys with diatonic chord progressions (circle of fifths relationships)
+            const KEYS = {
+                'C':  { chords: ['C', 'Am', 'Dm', 'G', 'Em'] },
+                'G':  { chords: ['G', 'Em', 'Am', 'C', 'D'] },
+                'D':  { chords: ['D', 'Em', 'G', 'A'] },
+                'Am': { chords: ['Am', 'Dm', 'E', 'G', 'C'] },
+                'Em': { chords: ['Em', 'Am', 'G', 'D', 'C'] },
+            };
+
+            // Common chord progressions (indices into key's chord array)
+            const PROGRESSIONS = [
+                [0, 1, 3, 2],       // I - vi - IV - ii (pop progression variant)
+                [0, 3, 1, 2],       // I - IV - vi - ii
+                [0, 2, 3, 0],       // I - ii - IV - I
+                [0, 1, 2, 3],       // I - vi - ii - IV
+                [0, 3, 0, 2],       // I - IV - I - ii
+            ];
+
+            // Pick random key and progression
+            const keyNames = Object.keys(KEYS);
+            const keyName = keyNames[Math.floor(Math.random() * keyNames.length)];
+            const key = KEYS[keyName];
+            const progression = PROGRESSIONS[Math.floor(Math.random() * PROGRESSIONS.length)];
+
+            // Build the song: 2 repetitions of a 4-chord progression (32 beats total)
+            const notes = [];
+            const sustains = [];
+            let position = 0;
+
+            for (let rep = 0; rep < 2; rep++) {
+                for (let i = 0; i < 4; i++) {
+                    const chordIdx = progression[i];
+                    const chordName = key.chords[chordIdx % key.chords.length];
+                    const chordNotes = CHORDS[chordName];
+                    const melodyNotes = MELODY[chordName];
+
+                    // Place chord on guitar 1 (staff 0) at start of bar
+                    if (chordNotes) {
+                        for (const note of chordNotes) {
+                            notes.push({ staff: 0, string: note.string, position: position, fret: note.fret });
+                        }
+                        // Sustain the chord
+                        sustains.push({ staff: 0, position: position });
+                    }
+
+                    // Generate melody on guitar 2 (staff 1) - 4 beats per chord
+                    let lastMelodyIdx = -1;
+                    for (let beat = 0; beat < 4; beat++) {
+                        // Pick a melody note, try to avoid immediate repetition
+                        let melodyIdx;
+                        do {
+                            melodyIdx = Math.floor(Math.random() * melodyNotes.length);
+                        } while (melodyIdx === lastMelodyIdx && melodyNotes.length > 1);
+                        lastMelodyIdx = melodyIdx;
+
+                        const tone = melodyNotes[melodyIdx];
+                        notes.push({ staff: 1, string: tone.s, position: position + beat, fret: tone.f });
+
+                        // Sustain some notes for legato feel
+                        if (Math.random() < 0.25) {
+                            sustains.push({ staff: 1, position: position + beat });
+                        }
+                    }
+
+                    position += 4;
+                }
+            }
+
+            // Clear and load the generated song
+            clearTab();
+
+            // Place notes on the grid
+            for (const n of notes) {
+                const note = getNoteElement(n.staff, n.string, n.position);
+                if (note) note.textContent = n.fret;
+            }
+
+            // Set sustains
+            for (const s of sustains) {
+                if (s.staff < NUM_STAFFS && s.position < NUM_POSITIONS) {
+                    sustainState[s.staff][s.position] = true;
+                    const toggle = document.querySelector(`.sustain-toggle[data-staff="${s.staff}"][data-position="${s.position}"]`);
+                    if (toggle) toggle.classList.add('active');
+                }
+            }
+
+            // Save to URL
+            saveStateToUrl();
         }
 
         function loadSampleSong(hash) {
