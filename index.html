@@ -411,6 +411,7 @@
                 <option value="">Load a sample song...</option>
             </select>
             <button class="loop-btn" onclick="generateRandomSong()">Random</button>
+            <button class="loop-btn" id="chromaticBtn" onclick="toggleChromatic()">7ths</button>
         </div>
         <div class="controls">
             <button class="play-btn" id="playBtn" onclick="togglePlayback()">Play</button>
@@ -824,6 +825,7 @@
         let guitar2Enabled = true;
         let arpeggioEnabled = false;
         let chordModeEnabled = false;
+        let chromaticEnabled = false;
 
         // Waveform per guitar
         const guitarWaveforms = ['triangle', 'triangle'];
@@ -1428,6 +1430,11 @@
         function toggleArpeggio() {
             arpeggioEnabled = !arpeggioEnabled;
             document.getElementById('arpeggioBtn').classList.toggle('active', arpeggioEnabled);
+        }
+
+        function toggleChromatic() {
+            chromaticEnabled = !chromaticEnabled;
+            document.getElementById('chromaticBtn').classList.toggle('active', chromaticEnabled);
         }
 
         function clearTab() {
@@ -2051,6 +2058,14 @@
                 Am: [{string:0,fret:0},{string:1,fret:1},{string:2,fret:2},{string:3,fret:2},{string:4,fret:0}],
                 Dm: [{string:0,fret:1},{string:1,fret:3},{string:2,fret:2},{string:3,fret:0}],
                 Em: [{string:0,fret:0},{string:1,fret:0},{string:2,fret:0},{string:3,fret:2},{string:4,fret:2},{string:5,fret:0}],
+                // 7th chords for chromatic mode
+                A7: [{string:0,fret:0},{string:1,fret:2},{string:2,fret:0},{string:3,fret:2},{string:4,fret:0}],
+                B7: [{string:0,fret:2},{string:1,fret:0},{string:2,fret:2},{string:3,fret:1},{string:4,fret:2}],
+                D7: [{string:0,fret:2},{string:1,fret:1},{string:2,fret:2},{string:3,fret:0}],
+                E7: [{string:0,fret:0},{string:1,fret:0},{string:2,fret:1},{string:3,fret:0},{string:4,fret:2},{string:5,fret:0}],
+                G7: [{string:0,fret:1},{string:1,fret:0},{string:2,fret:0},{string:3,fret:0},{string:4,fret:2},{string:5,fret:3}],
+                F:  [{string:0,fret:1},{string:1,fret:1},{string:2,fret:2},{string:3,fret:3},{string:4,fret:3},{string:5,fret:1}],
+                Bm: [{string:0,fret:2},{string:1,fret:3},{string:2,fret:4},{string:3,fret:4},{string:4,fret:2}],
             };
 
             // Melody notes that sound good over each chord (chord tones + passing tones)
@@ -2063,10 +2078,18 @@
                 Am: [{s:0,f:0},{s:0,f:5},{s:1,f:1},{s:1,f:5},{s:2,f:2}],
                 Dm: [{s:0,f:1},{s:0,f:5},{s:1,f:3},{s:1,f:6},{s:2,f:2}],
                 Em: [{s:0,f:0},{s:0,f:3},{s:1,f:0},{s:1,f:3},{s:2,f:0}],
+                // 7th chord melodies (include the 7th)
+                A7: [{s:0,f:0},{s:0,f:3},{s:1,f:2},{s:2,f:0},{s:2,f:2}],
+                B7: [{s:0,f:2},{s:0,f:0},{s:1,f:0},{s:2,f:2},{s:1,f:4}],
+                D7: [{s:0,f:2},{s:0,f:5},{s:1,f:1},{s:1,f:3},{s:2,f:2}],
+                E7: [{s:0,f:0},{s:0,f:3},{s:1,f:0},{s:2,f:1},{s:1,f:5}],
+                G7: [{s:0,f:1},{s:0,f:3},{s:1,f:0},{s:2,f:0},{s:1,f:3}],
+                F:  [{s:0,f:1},{s:0,f:5},{s:1,f:1},{s:2,f:2},{s:1,f:6}],
+                Bm: [{s:0,f:2},{s:0,f:5},{s:1,f:3},{s:2,f:4},{s:1,f:0}],
             };
 
             // Keys with diatonic chord progressions (circle of fifths relationships)
-            const KEYS = {
+            const KEYS_BASIC = {
                 'C':  { chords: ['C', 'Am', 'Dm', 'G', 'Em'] },
                 'G':  { chords: ['G', 'Em', 'Am', 'C', 'D'] },
                 'D':  { chords: ['D', 'Em', 'G', 'A'] },
@@ -2074,14 +2097,37 @@
                 'Em': { chords: ['Em', 'Am', 'G', 'D', 'C'] },
             };
 
+            // Chromatic keys with 7ths, secondary dominants, and more minors
+            const KEYS_CHROMATIC = {
+                'C':  { chords: ['C', 'Am', 'Dm', 'G7', 'Em', 'F', 'A7', 'D7'] },
+                'G':  { chords: ['G', 'Em', 'Am', 'C', 'D7', 'Bm', 'E7', 'A7'] },
+                'D':  { chords: ['D', 'Em', 'G', 'A7', 'Bm', 'E7', 'D7'] },
+                'Am': { chords: ['Am', 'Dm', 'E7', 'G', 'C', 'F', 'B7', 'A7'] },
+                'Em': { chords: ['Em', 'Am', 'G', 'D', 'C', 'B7', 'A7', 'Bm'] },
+            };
+
+            const KEYS = chromaticEnabled ? KEYS_CHROMATIC : KEYS_BASIC;
+
             // Common chord progressions (indices into key's chord array)
-            const PROGRESSIONS = [
+            const PROGRESSIONS_BASIC = [
                 [0, 1, 3, 2],       // I - vi - IV - ii (pop progression variant)
                 [0, 3, 1, 2],       // I - IV - vi - ii
                 [0, 2, 3, 0],       // I - ii - IV - I
                 [0, 1, 2, 3],       // I - vi - ii - IV
                 [0, 3, 0, 2],       // I - IV - I - ii
             ];
+
+            // Chromatic progressions with secondary dominants and more movement
+            const PROGRESSIONS_CHROMATIC = [
+                [0, 6, 2, 3],       // I - V/ii - ii - V7 (secondary dominant to ii)
+                [0, 5, 1, 3],       // I - IV - vi - V7
+                [0, 1, 7, 3],       // I - vi - V/V - V7 (secondary dominant to V)
+                [0, 4, 1, 3],       // I - iii - vi - V7
+                [0, 2, 6, 3],       // I - ii - V/ii - V7
+                [0, 5, 2, 3],       // I - IV - ii - V7
+            ];
+
+            const PROGRESSIONS = chromaticEnabled ? PROGRESSIONS_CHROMATIC : PROGRESSIONS_BASIC;
 
             // Pick random key and progression
             const keyNames = Object.keys(KEYS);
