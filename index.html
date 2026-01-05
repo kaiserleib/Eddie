@@ -412,6 +412,7 @@
             </select>
             <button class="loop-btn" onclick="generateRandomSong()">Random</button>
             <button class="loop-btn" id="chromaticBtn" onclick="toggleChromatic()">7ths</button>
+            <button class="loop-btn" id="soundtrackBtn" onclick="toggleSoundtrack()">Soundtrack</button>
         </div>
         <div class="controls">
             <button class="play-btn" id="playBtn" onclick="togglePlayback()">Play</button>
@@ -1394,6 +1395,9 @@
         let isPlaying = false;
         let loopEnabled = true;
         let playbackTimeout = null;
+        let soundtrackEnabled = false;
+        let soundtrackPlayCount = 0;
+        let soundtrackTargetCount = 0;
 
         // Track active sustained notes per staff per string
         const activeNotes = Array.from({ length: NUM_STAFFS }, () =>
@@ -1435,6 +1439,21 @@
         function toggleChromatic() {
             chromaticEnabled = !chromaticEnabled;
             document.getElementById('chromaticBtn').classList.toggle('active', chromaticEnabled);
+        }
+
+        function toggleSoundtrack() {
+            soundtrackEnabled = !soundtrackEnabled;
+            document.getElementById('soundtrackBtn').classList.toggle('active', soundtrackEnabled);
+            if (soundtrackEnabled) {
+                // Initialize soundtrack mode
+                soundtrackPlayCount = 0;
+                soundtrackTargetCount = Math.floor(Math.random() * 4) + 2; // 2-5 plays
+                // Ensure loop is enabled for soundtrack mode
+                if (!loopEnabled) {
+                    loopEnabled = true;
+                    document.getElementById('loopBtn').classList.add('active');
+                }
+            }
         }
 
         function clearTab() {
@@ -1567,6 +1586,18 @@
             if (position > lastPosition) {
                 stopAllActiveNotes();
                 if (loopEnabled) {
+                    // Handle soundtrack mode
+                    if (soundtrackEnabled) {
+                        soundtrackPlayCount++;
+                        if (soundtrackPlayCount >= soundtrackTargetCount) {
+                            // Generate new song (resets counter internally)
+                            generateRandomSong();
+                            // Start playing the new song
+                            const newLastPosition = findLastNotePosition();
+                            playPosition(0, newLastPosition);
+                            return;
+                        }
+                    }
                     playPosition(0, lastPosition);
                     return;
                 } else {
@@ -2047,6 +2078,12 @@
 
         // Random song generator using music theory
         function generateRandomSong() {
+            // Reset soundtrack counter when generating a new song
+            if (soundtrackEnabled) {
+                soundtrackPlayCount = 0;
+                soundtrackTargetCount = Math.floor(Math.random() * 4) + 2; // 2-5 plays
+            }
+
             // Chord voicings (matching predefined chord IDs)
             // Strings: 0=e, 1=B, 2=G, 3=D, 4=A, 5=E
             const CHORDS = {
